@@ -13,31 +13,46 @@ const ComfyUIWorkflowManager: React.FC<ComfyUIWorkflowManagerProps> = ({ isOpen,
     const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
     const [name, setName] = useState('');
     const [json, setJson] = useState('');
-    const [isCreatingNew, setIsCreatingNew] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Effect to sync the form state to the selected workflow
     useEffect(() => {
-        if (isOpen && workflows.length > 0 && !isCreatingNew) {
-            const firstWorkflow = workflows[0];
-            setSelectedWorkflowId(firstWorkflow.id);
-            setName(firstWorkflow.name);
-            setJson(firstWorkflow.workflowJson);
-        } else if (isCreatingNew) {
-            setSelectedWorkflowId(null);
-            setName('');
-            setJson('');
+        if (selectedWorkflowId) {
+            const selected = workflows.find(w => w.id === selectedWorkflowId);
+            if (selected) {
+                setName(selected.name);
+                setJson(selected.workflowJson);
+            }
         }
-    }, [isOpen, workflows, isCreatingNew]);
+        // When selectedWorkflowId is null, we are in "new" mode.
+        // We don't clear the form here because it might have been populated by an import.
+        // Clearing is an explicit action in handleNewWorkflow.
+    }, [selectedWorkflowId, workflows]);
+
+    // Effect to handle the initial state when the modal opens or when the list changes
+    useEffect(() => {
+        if (isOpen) {
+            const selectionIsValid = selectedWorkflowId && workflows.some(w => w.id === selectedWorkflowId);
+            if (!selectionIsValid) {
+                // If there's no valid selection (e.g., on first open or after deletion),
+                // default to the first item or enter 'new' mode.
+                if (workflows.length > 0) {
+                    setSelectedWorkflowId(workflows[0].id);
+                } else {
+                    // No workflows exist, so enter 'new' mode.
+                    setSelectedWorkflowId(null);
+                    setName('');
+                    setJson('');
+                }
+            }
+        }
+    }, [isOpen, workflows]);
 
     const handleSelectWorkflow = (workflow: ComfyUIWorkflowPreset) => {
         setSelectedWorkflowId(workflow.id);
-        setName(workflow.name);
-        setJson(workflow.workflowJson);
-        setIsCreatingNew(false);
     };
 
     const handleNewWorkflow = () => {
-        setIsCreatingNew(true);
         setSelectedWorkflowId(null);
         setName('');
         setJson('');
@@ -60,8 +75,7 @@ const ComfyUIWorkflowManager: React.FC<ComfyUIWorkflowManagerProps> = ({ isOpen,
                 // Validate that the content is valid JSON
                 JSON.parse(content);
                 
-                // Set the state to "creating new" to prepare for saving
-                setIsCreatingNew(true);
+                // Set state to 'creating new' to prepare for saving
                 setSelectedWorkflowId(null);
 
                 // Populate the form fields
@@ -111,18 +125,22 @@ const ComfyUIWorkflowManager: React.FC<ComfyUIWorkflowManagerProps> = ({ isOpen,
             return;
         }
 
+        const isNew = !selectedWorkflowId;
         const workflow: ComfyUIWorkflowPreset = {
             id: selectedWorkflowId || crypto.randomUUID(),
             name: name.trim(),
             workflowJson: json,
         };
         onSave(workflow);
-        if (isCreatingNew) {
-            handleSelectWorkflow(workflow);
+        if (isNew) {
+            // After saving, immediately select the new workflow by its ID.
+            // This transitions from 'new' mode to 'edit' mode.
+            setSelectedWorkflowId(workflow.id);
         }
     };
     
     const isDefault = selectedWorkflowId?.startsWith('default-');
+    const isNew = !selectedWorkflowId;
 
     if (!isOpen) return null;
 
@@ -200,7 +218,7 @@ const ComfyUIWorkflowManager: React.FC<ComfyUIWorkflowManagerProps> = ({ isOpen,
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder="My Awesome Workflow"
-                                className="w-full p-2 bg-bg-tertiary border border-border-primary rounded-md text-text-primary placeholder-text-secondary/70 focus:ring-2 focus:ring-accent"
+                                className="w-full p-2 bg-input-bg border border-input-border rounded-md text-input-text placeholder-input-placeholder/70 focus:ring-2 focus:ring-accent"
                                 disabled={isDefault}
                             />
                         </div>
@@ -211,7 +229,7 @@ const ComfyUIWorkflowManager: React.FC<ComfyUIWorkflowManagerProps> = ({ isOpen,
                                 value={json}
                                 onChange={(e) => setJson(e.target.value)}
                                 placeholder='Paste your ComfyUI "API Format" JSON here.'
-                                className="w-full h-full p-3 bg-bg-tertiary border border-border-primary rounded-md text-text-primary placeholder-text-secondary/70 focus:ring-2 focus:ring-accent resize-none font-mono text-xs"
+                                className="w-full h-full p-3 bg-input-bg border border-input-border rounded-md text-input-text placeholder-input-placeholder/70 focus:ring-2 focus:ring-accent resize-none font-mono text-xs"
                                 disabled={isDefault}
                             />
                         </div>
@@ -223,7 +241,7 @@ const ComfyUIWorkflowManager: React.FC<ComfyUIWorkflowManagerProps> = ({ isOpen,
                         Close
                     </button>
                     <button onClick={handleSave} disabled={!name.trim() || !json.trim() || isDefault} className="px-6 py-2 font-semibold text-white bg-accent rounded-md hover:bg-accent-hover disabled:bg-bg-tertiary disabled:cursor-not-allowed transition-colors">
-                        {isCreatingNew ? 'Save New Workflow' : 'Save Changes'}
+                        {isNew ? 'Save New Workflow' : 'Save Changes'}
                     </button>
                 </div>
             </div>

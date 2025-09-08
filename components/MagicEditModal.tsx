@@ -48,7 +48,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({ isOpen, isLoading, imag
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                             placeholder="e.g., 'Add a wizard hat on the cat', 'Remove the person on the left', 'Change the background to a snowy forest'"
-                            className="w-full h-40 p-3 bg-bg-tertiary border border-border-primary rounded-md text-text-primary placeholder-text-secondary/70 focus:ring-2 focus:ring-accent resize-none"
+                            className="w-full h-40 p-3 bg-input-bg border border-input-border rounded-md text-input-text placeholder-input-placeholder/70 focus:ring-2 focus:ring-accent resize-none"
                             disabled={isLoading}
                         />
                          <button

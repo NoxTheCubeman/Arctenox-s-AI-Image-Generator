@@ -85,7 +85,7 @@ const StyleManager: React.FC<StyleManagerProps> = ({
                                         value={presetName}
                                         onChange={(e) => setPresetName(e.target.value)}
                                         placeholder="Enter preset name"
-                                        className="flex-grow p-2 bg-bg-tertiary border border-border-primary rounded-md text-text-primary placeholder-text-secondary/70 focus:ring-2 focus:ring-accent"
+                                        className="flex-grow p-2 bg-input-bg border border-input-border rounded-md text-input-text placeholder-input-placeholder/70 focus:ring-2 focus:ring-accent"
                                         aria-label="Preset name"
                                     />
                                     <button
@@ -132,14 +132,14 @@ const StyleManager: React.FC<StyleManagerProps> = ({
                                     value={customStyleName}
                                     onChange={(e) => setCustomStyleName(e.target.value)}
                                     placeholder="Style Name (e.g., My Sketch Style)"
-                                    className="w-full p-2 bg-bg-tertiary border border-border-primary rounded-md text-text-primary placeholder-text-secondary/70 focus:ring-2 focus:ring-accent"
+                                    className="w-full p-2 bg-input-bg border border-input-border rounded-md text-input-text placeholder-input-placeholder/70 focus:ring-2 focus:ring-accent"
                                     aria-label="New custom style name"
                                 />
                                 <textarea
                                     value={customStylePrompt}
                                     onChange={(e) => setCustomStylePrompt(e.target.value)}
                                     placeholder="Prompt Modifiers (e.g., charcoal sketch, black and white, rough paper)"
-                                    className="w-full h-24 p-2 bg-bg-tertiary border border-border-primary rounded-md text-text-primary placeholder-text-secondary/70 focus:ring-2 focus:ring-accent resize-none"
+                                    className="w-full h-24 p-2 bg-input-bg border border-input-border rounded-md text-input-text placeholder-input-placeholder/70 focus:ring-2 focus:ring-accent resize-none"
                                     aria-label="New custom style prompt modifiers"
                                 />
                                 <button

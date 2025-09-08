@@ -5,6 +5,8 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Image Generator</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#F06292">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -21,6 +23,10 @@
               'text-primary': 'var(--color-text-primary)',
               'text-secondary': 'var(--color-text-secondary)',
               'border-primary': 'var(--color-border-primary)',
+              'input-bg': 'rgba(var(--color-input-bg-rgb), var(--ui-opacity, 1))',
+              'input-border': 'var(--color-input-border)',
+              'input-text': 'var(--color-input-text)',
+              'input-placeholder': 'var(--color-input-placeholder)',
               'danger': 'var(--color-danger)',
               'danger-bg': 'rgba(var(--color-danger-bg-rgb), var(--ui-opacity, 0.5))',
               'success': 'var(--color-success)',

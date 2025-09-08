@@ -1,17 +1,69 @@
 // services/comfyuiService.ts
 
-// A default text-to-image workflow to pre-populate the text area.
-export const DEFAULT_T2I_WORKFLOW_API = `{
+import type { LoRA } from '../types';
+
+// A new, simple text-to-image workflow without any LoRA loaders.
+export const DEFAULT_T2I_SIMPLE_WORKFLOW_API = `{
   "3": {
     "inputs": {
-      "seed": 156683808981188,
+      "seed": 156680208700286,
+      "steps": 20,
+      "cfg": 8,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": ["4", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler" }
+  },
+  "4": {
+    "inputs": { "ckpt_name": "v1-5-pruned-emaonly-fp16.safetensors" },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "Load Checkpoint" }
+  },
+  "5": {
+    "inputs": { "width": 1024, "height": 1024, "batch_size": 1 },
+    "class_type": "EmptyLatentImage",
+    "_meta": { "title": "Empty Latent Image" }
+  },
+  "6": {
+    "inputs": { "text": "", "clip": ["4", 1] },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Positive Prompt" }
+  },
+  "7": {
+    "inputs": { "text": "", "clip": ["4", 1] },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Negative Prompt" }
+  },
+  "8": {
+    "inputs": { "samples": ["3", 0], "vae": ["4", 2] },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "9": {
+    "inputs": { "filename_prefix": "ComfyUI", "images": ["8", 0] },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image" }
+  }
+}`;
+
+// A default text-to-image workflow with a standard LoraLoader.
+export const DEFAULT_T2I_SINGLE_LORA_WORKFLOW_API = `{
+  "3": {
+    "inputs": {
+      "seed": 156680208700286,
       "steps": 20,
       "cfg": 8,
       "sampler_name": "euler",
       "scheduler": "normal",
       "denoise": 1,
       "model": [
-        "4",
+        "11",
         0
       ],
       "positive": [
@@ -34,7 +86,7 @@ export const DEFAULT_T2I_WORKFLOW_API = `{
   },
   "4": {
     "inputs": {
-      "ckpt_name": "v1-5-pruned-emaonly.safetensors"
+      "ckpt_name": "v1-5-pruned-emaonly-fp16.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -54,9 +106,137 @@ export const DEFAULT_T2I_WORKFLOW_API = `{
   },
   "6": {
     "inputs": {
-      "text": "masterpiece, best quality, a beautiful painting",
+      "text": "",
+      "clip": [
+        "11",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "11",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "3",
+        0
+      ],
+      "vae": [
+        "4",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "9": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "11": {
+    "inputs": {
+      "lora_name": "anastasia_blackwell_-_main_oc_6-000010.safetensors",
+      "strength_model": 1,
+      "strength_clip": 1,
+      "model": [
+        "4",
+        0
+      ],
       "clip": [
         "4",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  }
+}`;
+
+// A default text-to-image workflow using rgthree's Power Lora Loader.
+export const DEFAULT_T2I_WORKFLOW_API = `{
+  "3": {
+    "inputs": {
+      "seed": 156680208700286,
+      "steps": 20,
+      "cfg": 8,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": [
+        "10",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "4": {
+    "inputs": {
+      "ckpt_name": "v1-5-pruned-emaonly-fp16.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "5": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "10",
         1
       ]
     },
@@ -67,9 +247,9 @@ export const DEFAULT_T2I_WORKFLOW_API = `{
   },
   "7": {
     "inputs": {
-      "text": "text, watermark",
+      "text": "",
       "clip": [
-        "4",
+        "10",
         1
       ]
     },
@@ -105,6 +285,25 @@ export const DEFAULT_T2I_WORKFLOW_API = `{
     "class_type": "SaveImage",
     "_meta": {
       "title": "Save Image"
+    }
+  },
+  "10": {
+    "inputs": {
+      "lora_name_1": "None",
+      "strength_model_1": 1,
+      "strength_clip_1": 1,
+      "model": [
+        "4",
+        0
+      ],
+      "clip": [
+        "4",
+        1
+      ]
+    },
+    "class_type": "Power Lora Loader (rgthree)",
+    "_meta": {
+      "title": "Power Lora Loader"
     }
   }
 }`;
@@ -278,6 +477,29 @@ export const getCheckpoints = async (address: string): Promise<string[]> => {
     }
 };
 
+export const getLoras = async (address: string): Promise<string[]> => {
+    try {
+        const response = await fetch(`${address}/object_info`, { mode: 'cors' });
+        if (!response.ok) throw new Error("Failed to fetch object info for LoRAs.");
+        const data = await response.json();
+        const loraLoaderInfo = Object.values(data).find((nodeInfo: any) => 
+            nodeInfo?.input?.required?.lora_name
+        ) as any;
+        
+        const loras = loraLoaderInfo?.input?.required?.lora_name?.[0];
+
+        if (!Array.isArray(loras)) {
+            console.warn("Could not find LoRAs list automatically. Your ComfyUI setup might be different.");
+            return [];
+        }
+        return loras;
+    } catch (e) {
+        console.error("Failed to get LoRAs:", e);
+        throw new Error("Could not fetch LoRAs from ComfyUI.");
+    }
+};
+
+
 export const uploadImage = async (address: string, imageDataUrl: string, filename: string): Promise<string> => {
     try {
         const blob = dataURLToBlob(imageDataUrl);
@@ -305,60 +527,136 @@ export const uploadImage = async (address: string, imageDataUrl: string, filenam
     }
 };
 
-interface ExtraData {
-  imageName?: string;
-  maskName?: string;
+export interface WorkflowAnalysis {
+    hasRgthreeLoader: boolean;
+    loraLoaderNodeIds: string[];
 }
 
-const queuePrompt = async (
+export const analyzeWorkflow = (workflowJson: string): WorkflowAnalysis => {
+    try {
+        const workflow = JSON.parse(workflowJson);
+        const analysis: WorkflowAnalysis = {
+            hasRgthreeLoader: false,
+            loraLoaderNodeIds: [],
+        };
+        const nodeIds = Object.keys(workflow);
+        for (const id of nodeIds) {
+            const node = workflow[id];
+            if (node.class_type === 'Power Lora Loader (rgthree)') {
+                analysis.hasRgthreeLoader = true;
+            }
+            if (node.class_type === 'LoraLoader') {
+                analysis.loraLoaderNodeIds.push(id);
+            }
+        }
+        // Sort node IDs numerically to ensure consistent order
+        analysis.loraLoaderNodeIds.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+        return analysis;
+    } catch (e) {
+        console.error("Failed to parse or analyze workflow:", e);
+        return { hasRgthreeLoader: false, loraLoaderNodeIds: [] };
+    }
+};
+
+
+export const queuePromptInBackground = async (
     address: string,
     workflowApi: string,
     prompt: string,
     negativePrompt: string,
     checkpoint: string,
     batchSize: number,
-    extraData: ExtraData = {}
-): Promise<{ prompt_id: string }> => {
+    width: number,
+    height: number,
+    seed: number,
+    loras: LoRA[],
+    cfg: number
+): Promise<void> => {
     try {
         const workflow = JSON.parse(workflowApi);
-
-        // Find nodes by title first
+        const analysis = analyzeWorkflow(workflowApi);
+        
+        // --- Find key nodes by title or type (fallback) ---
         let positivePromptNodeId: string | null = null;
         let negativePromptNodeId: string | null = null;
         let checkpointNodeId: string | null = null;
-        let imageNodeId: string | null = null;
-        let maskNodeId: string | null = null;
-        let batchNodeId: string | null = null;
-
+        let latentImageNodeId: string | null = null;
         const clipTextEncodeNodes: string[] = [];
 
         for (const id in workflow) {
             const node = workflow[id];
-            if (node._meta?.title === 'Positive Prompt') positivePromptNodeId = id;
-            if (node._meta?.title === 'Negative Prompt') negativePromptNodeId = id;
-            if (node._meta?.title === 'Load Checkpoint') checkpointNodeId = id;
-            if (node._meta?.title === 'Load Image') imageNodeId = id;
-            if (node._meta?.title === 'Load Image Mask') maskNodeId = id;
-            if (node._meta?.title === 'Empty Latent Image') batchNodeId = id;
+            if (node._meta?.title?.toLowerCase().includes('positive')) positivePromptNodeId = id;
+            if (node._meta?.title?.toLowerCase().includes('negative')) negativePromptNodeId = id;
+            if (node._meta?.title?.toLowerCase().includes('checkpoint')) checkpointNodeId = id;
+            if (node._meta?.title?.toLowerCase().includes('latent')) latentImageNodeId = id;
             if (node.class_type === 'CLIPTextEncode') clipTextEncodeNodes.push(id);
         }
 
-        // Fallback to class_type if titles are not found
         if (!checkpointNodeId) checkpointNodeId = Object.keys(workflow).find(id => workflow[id].class_type === 'CheckpointLoaderSimple') || null;
         if (!positivePromptNodeId && clipTextEncodeNodes.length > 0) positivePromptNodeId = clipTextEncodeNodes[0];
         if (!negativePromptNodeId && clipTextEncodeNodes.length > 1) negativePromptNodeId = clipTextEncodeNodes[1];
-        if (!imageNodeId) imageNodeId = Object.keys(workflow).find(id => workflow[id].class_type === 'LoadImage') || null;
-        if (!maskNodeId) maskNodeId = Object.keys(workflow).find(id => workflow[id].class_type === 'LoadImage') || null;
-        if (!batchNodeId) batchNodeId = Object.keys(workflow).find(id => workflow[id].class_type === 'EmptyLatentImage') || null;
+        if (!latentImageNodeId) latentImageNodeId = Object.keys(workflow).find(id => workflow[id].class_type === 'EmptyLatentImage') || null;
+        
+        if (!checkpointNodeId) throw new Error("Could not find a 'Load Checkpoint' (CheckpointLoaderSimple) node in the workflow.");
 
-        // Modify the workflow
-        if (checkpointNodeId && checkpoint) workflow[checkpointNodeId].inputs.ckpt_name = checkpoint;
-        if (positivePromptNodeId) workflow[positivePromptNodeId].inputs.text = prompt;
-        else throw new Error("Could not find a 'Positive Prompt' node (CLIPTextEncode) in the workflow.");
+        // --- Handle LoRAs ---
+        if (analysis.hasRgthreeLoader) {
+            const powerLoraLoaderNodeId = Object.keys(workflow).find(id => workflow[id].class_type === 'Power Lora Loader (rgthree)');
+            if (powerLoraLoaderNodeId) {
+                const loraList = loras
+                    .filter(lora => lora.name)
+                    .map(lora => [lora.name, lora.strength, lora.strength]);
+                workflow[powerLoraLoaderNodeId].inputs.loras = loraList;
+            }
+        } else if (analysis.loraLoaderNodeIds.length > 0) {
+            analysis.loraLoaderNodeIds.forEach((nodeId, index) => {
+                const loraConfig = loras[index];
+                if (loraConfig && loraConfig.name) {
+                    const node = workflow[nodeId];
+                    if (node) {
+                        node.inputs.lora_name = loraConfig.name;
+                        node.inputs.strength_model = loraConfig.strength;
+                        node.inputs.strength_clip = loraConfig.strength;
+                    }
+                }
+            });
+        }
+        
+        // --- Update basic generation parameters ---
+        let seedUpdated = false;
+        let cfgUpdated = false;
+        for (const id in workflow) {
+            const node = workflow[id];
+            if (node.inputs && 'seed' in node.inputs) {
+                node.inputs.seed = seed;
+                seedUpdated = true;
+            }
+             if (node.inputs && 'cfg' in node.inputs) {
+                node.inputs.cfg = cfg;
+                cfgUpdated = true;
+            }
+        }
+
+        if (!seedUpdated) console.warn("Could not find a 'seed' input in any node.");
+        if (!cfgUpdated) console.warn("Could not find a 'cfg' input in any node.");
+
+        if (checkpoint) workflow[checkpointNodeId].inputs.ckpt_name = checkpoint;
+
+        if (positivePromptNodeId) {
+            workflow[positivePromptNodeId].inputs.text = prompt;
+        } else {
+            throw new Error("Could not find a 'Positive Prompt' node (CLIPTextEncode) in the workflow.");
+        }
+        
         if (negativePromptNodeId) workflow[negativePromptNodeId].inputs.text = negativePrompt;
-        if (extraData.imageName && imageNodeId) workflow[imageNodeId].inputs.image = extraData.imageName;
-        if (extraData.maskName && maskNodeId) workflow[maskNodeId].inputs.image = extraData.maskName;
-        if (batchNodeId && batchSize > 0) workflow[batchNodeId].inputs.batch_size = batchSize;
+        
+        if (latentImageNodeId) {
+            workflow[latentImageNodeId].inputs.batch_size = batchSize;
+            workflow[latentImageNodeId].inputs.width = width;
+            workflow[latentImageNodeId].inputs.height = height;
+        } else {
+             console.warn("Could not find an 'Empty Latent Image' node. Batch size and resolution will not be changed.");
+        }
         
         const body = JSON.stringify({ prompt: workflow });
         
@@ -374,8 +672,6 @@ const queuePrompt = async (
             throw new Error(`ComfyUI Error: ${errorText}`);
         }
 
-        return await response.json();
-
     } catch (e) {
         console.error("Failed to queue prompt:", e);
         if (e instanceof SyntaxError) throw new Error("Invalid Workflow API JSON. Please check the format.");
@@ -383,159 +679,144 @@ const queuePrompt = async (
     }
 };
 
-export interface ComfyUIStatus {
-    message: string;
-    progress?: { value: number; max: number };
+export interface ComfyUISyncedImage {
+    imageDataUrl: string;
+    prompt: string;
+    workflowJson: string;
+    filename: string;
 }
 
-export const executePrompt = (
-    address: string,
-    workflowApi: string,
-    prompt: string,
-    negativePrompt: string,
-    checkpoint: string,
-    batchSize: number,
-    extraData: ExtraData,
-    callbacks: {
-        onStatus: (status: ComfyUIStatus) => void;
-        onSuccess: (images: string[]) => void;
-        onError: (error: Error) => void;
-    }
-): { close: () => void } => {
-    const clientId = crypto.randomUUID();
-    let ws: WebSocket | null = null;
-    let serverUrl: URL;
-
-    try {
-        serverUrl = new URL(address);
-    } catch (e) {
-        callbacks.onError(new Error("Invalid server address provided."));
-        return { close: () => {} };
-    }
-
-    const connectWebSocket = (promptId: string) => {
-        callbacks.onStatus({ message: 'Connecting to WebSocket...' });
-        const wsProtocol = serverUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${wsProtocol}//${serverUrl.host}/ws?clientId=${clientId}`);
-
-        ws.onopen = () => callbacks.onStatus({ message: 'WebSocket connected. Waiting for prompt execution...' });
-        
-        ws.onmessage = async (event) => {
-            if (typeof event.data !== 'string') return;
-            const msg = JSON.parse(event.data);
-            
-            const messageType = msg.type;
-            const isFinalMessage = (messageType === 'executed' || messageType === 'execution_cached') && msg.data.prompt_id === promptId;
-
-            if (messageType === 'status') {
-                 const queueRemaining = msg.data?.status?.exec_info?.queue_remaining;
-                 if (queueRemaining !== undefined && queueRemaining > 0) callbacks.onStatus({ message: `Info: Queue remaining: ${queueRemaining}`});
-            } else if (messageType === 'progress') {
-                callbacks.onStatus({ message: `Executing node...`, progress: { value: msg.data.value, max: msg.data.max } });
-            } else if (isFinalMessage) {
-                const outputs = msg.data.output;
-                let allImages: any[] = [];
-
-                if (outputs) {
-                    for (const nodeId in outputs) {
-                        if (outputs[nodeId]?.images) allImages = allImages.concat(outputs[nodeId].images);
-                    }
-                }
-
-                if (allImages.length > 0) {
-                    callbacks.onStatus({ message: 'Execution complete. Fetching images...' });
-                    try {
-                        const fetchedImages = await Promise.all(allImages.map(async (output: any) => {
-                            const imageUrl = `${serverUrl.protocol}//${serverUrl.host}/view?filename=${encodeURIComponent(output.filename)}&subfolder=${encodeURIComponent(output.subfolder)}&type=${encodeURIComponent(output.type)}`;
-                            const response = await fetch(imageUrl);
-                            if (!response.ok) throw new Error(`Failed to fetch image: ${output.filename}`);
-                            const blob = await response.blob();
-                            return new Promise<string>((resolve, reject) => {
-                                const reader = new FileReader();
-                                reader.onloadend = () => resolve(reader.result as string);
-                                reader.onerror = reject;
-                                reader.readAsDataURL(blob);
-                            });
-                        }));
-                        callbacks.onSuccess(fetchedImages);
-                    } catch(e) {
-                         callbacks.onError(e instanceof Error ? e : new Error(`Failed to fetch a generated image.`));
-                    } finally {
-                        ws?.close();
-                    }
-                } else {
-                    callbacks.onError(new Error("Workflow executed successfully, but no image was saved. Please ensure your workflow includes a 'Save Image' node."));
-                    ws?.close();
-                }
-            } else if (messageType === 'execution_error') {
-                 callbacks.onError(new Error(`Execution Error: ${JSON.stringify(msg.data.exception_message)}`));
-                 ws?.close();
-            }
-        };
-        
-        ws.onerror = (event) => {
-            callbacks.onError(new Error('WebSocket error occurred. Check server connection and CORS settings.'));
-            console.error('WebSocket Error:', event);
-        };
-    };
-
-    (async () => {
-        try {
-            callbacks.onStatus({ message: 'Queueing prompt via HTTP...' });
-            const response = await queuePrompt(address, workflowApi, prompt, negativePrompt, checkpoint, batchSize, extraData);
-            connectWebSocket(response.prompt_id);
-        } catch (e) {
-            callbacks.onError(e instanceof Error ? e : new Error('An unknown error occurred during queuing.'));
-        }
-    })();
-    
-    return {
-        close: () => {
-            if (ws && ws.readyState === WebSocket.OPEN) ws.close();
-        }
-    };
-};
-
-export const fetchLatestImage = async (address: string): Promise<string> => {
+export const fetchRecentImages = async (address: string): Promise<ComfyUISyncedImage[]> => {
     try {
         const historyResponse = await fetch(`${address}/history`, { mode: 'cors' });
         if (!historyResponse.ok) throw new Error("Failed to fetch ComfyUI history.");
         const history = await historyResponse.json();
         
         const promptIds = Object.keys(history);
-        if (promptIds.length === 0) throw new Error("No recent images found in ComfyUI history.");
+        if (promptIds.length === 0) return [];
+        
+        const serverUrl = new URL(address);
+        const recentImageData: ComfyUISyncedImage[] = [];
+        const seenFilenames = new Set();
+        const maxImagesToSync = 5;
 
-        const latestPrompt = history[promptIds[0]];
-        const outputs = latestPrompt.outputs;
-        if (!outputs) throw new Error("Latest history entry has no outputs.");
+        for (const promptId of promptIds) {
+            if (recentImageData.length >= maxImagesToSync) break;
 
-        let latestImageInfo = null;
-        for (const nodeId in outputs) {
-            if (outputs[nodeId].images && outputs[nodeId].images.length > 0) {
-                latestImageInfo = outputs[nodeId].images[outputs[nodeId].images.length - 1];
-                break;
+            const entry = history[promptId];
+            const outputs = entry.outputs;
+            if (!outputs) continue;
+
+            const workflowJson = JSON.stringify(entry.prompt[2], null, 2);
+            let positivePromptText = 'Generated from ComfyUI';
+
+            try {
+                 const workflow = entry.prompt[2];
+                 const positivePromptNode = Object.values(workflow).find((node: any) => node._meta?.title === 'Positive Prompt' || node.class_type === 'CLIPTextEncode') as any;
+                 if (positivePromptNode) {
+                    positivePromptText = positivePromptNode.inputs.text;
+                 }
+            } catch {}
+
+            for (const nodeId in outputs) {
+                if (outputs[nodeId].images) {
+                    for (const imageInfo of outputs[nodeId].images) {
+                        if (seenFilenames.has(imageInfo.filename)) continue;
+
+                        const { filename, subfolder, type } = imageInfo;
+                        const imageUrl = `${serverUrl.protocol}//${serverUrl.host}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}`;
+
+                        const imageResponse = await fetch(imageUrl);
+                        if (!imageResponse.ok) {
+                            console.warn(`Skipping missing image file: ${filename}`);
+                            continue;
+                        }
+
+                        const blob = await imageResponse.blob();
+                        const imageDataUrl = await new Promise<string>((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result as string);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(blob);
+                        });
+
+                        recentImageData.push({
+                            imageDataUrl,
+                            prompt: positivePromptText,
+                            workflowJson,
+                            filename,
+                        });
+                        seenFilenames.add(filename);
+                        if (recentImageData.length >= maxImagesToSync) break;
+                    }
+                }
+                 if (recentImageData.length >= maxImagesToSync) break;
             }
         }
-
-        if (!latestImageInfo) throw new Error("Could not find an image in the latest ComfyUI history entry.");
-
-        const { filename, subfolder, type } = latestImageInfo;
-        const serverUrl = new URL(address);
-        const imageUrl = `${serverUrl.protocol}//${serverUrl.host}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}`;
-
-        const imageResponse = await fetch(imageUrl);
-        if (!imageResponse.ok) throw new Error(`Failed to fetch image file: ${filename}`);
-
-        const blob = await imageResponse.blob();
-        return new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
+        
+        return recentImageData;
 
     } catch (e) {
-        console.error("Failed to fetch latest image from ComfyUI:", e);
-        throw e;
+        console.error("Failed to fetch recent images from ComfyUI:", e);
+        throw e instanceof Error ? e : new Error("An unknown error occurred while syncing images.");
+    }
+};
+
+// Helper to get image dimensions from a data URL
+const getImageDimensions = (dataUrl: string): Promise<{width: number, height: number}> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            resolve({ width: img.width, height: img.height });
+        };
+        img.onerror = () => {
+            reject(new Error("Could not load image to get dimensions."));
+        };
+        img.src = dataUrl;
+    });
+};
+
+/**
+ * Uploads an image to ComfyUI and prepares the JSON for a 'LoadImage' node.
+ * @param address The ComfyUI server address.
+ * @param imageDataUrl The data URL of the image to upload.
+ * @returns A stringified JSON object for the ComfyUI graph node.
+ */
+export const uploadAndPrepareNodeData = async (address: string, imageDataUrl: string): Promise<string> => {
+    try {
+        const uniqueFilename = `app-upload-${Date.now()}.png`;
+        const uploadedFilename = await uploadImage(address, imageDataUrl, uniqueFilename);
+        const { width, height } = await getImageDimensions(imageDataUrl);
+        
+        const node = {
+            id: Math.floor(Math.random() * 100000) + 1, // A random ID
+            type: "LoadImage",
+            pos: [0, 0], // Position on canvas, user can move it
+            size: { "0": width, "1": height + 80 }, // Base size on image, add some height for widgets
+            flags: {},
+            order: 0,
+            mode: 0,
+            inputs: [],
+            outputs: [
+                { name: "IMAGE", type: "IMAGE", links: null },
+                { name: "MASK", type: "MASK", links: null }
+            ],
+            properties: { "Node name for S&R": "LoadImage" },
+            widgets_values: [uploadedFilename]
+        };
+
+        const graph = {
+            version: 0.4,
+            nodes: [node]
+        };
+        
+        return JSON.stringify(graph);
+
+    } catch (e) {
+        console.error("Failed to upload image and prepare node:", e);
+        if (e instanceof Error && e.message.includes('Failed to upload image')) {
+            throw new Error("Could not upload image to ComfyUI. Check the server connection and console.");
+        }
+        throw new Error("Failed to prepare ComfyUI node data.");
     }
 };

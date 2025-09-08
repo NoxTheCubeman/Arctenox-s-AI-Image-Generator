@@ -14,7 +14,7 @@ const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({ theme, setTheme, customTh
       <select
         value={theme}
         onChange={(e) => setTheme(e.target.value)}
-        className="appearance-none bg-bg-tertiary border border-border-primary text-text-primary text-sm rounded-md px-3 py-1 pr-8 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+        className="appearance-none bg-input-bg border border-input-border text-input-text text-sm rounded-md px-3 py-1 pr-8 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
         aria-label="Select color theme"
       >
         <optgroup label="Built-in Themes">

@@ -110,6 +110,10 @@ export const generateRandomTheme = (): Theme => {
     const warningBgRgb = hslToRgb(45, 30, statusBgL);
     const infoBgRgb = hslToRgb(210, 30, statusBgL);
     
+    // Create input field colors
+    const inputBgRgb = hslToRgb(baseHue, saturation, isDarkTheme ? bgL_base + 10 : bgL_base - 5);
+    const inputBorderRgb = hslToRgb(baseHue, saturation, isDarkTheme ? bgL_base + 20 : bgL_base - 12);
+
     const theme: Theme = {
         '--color-bg-primary-rgb': `${bgPrimaryRgb.r}, ${bgPrimaryRgb.g}, ${bgPrimaryRgb.b}`,
         '--color-bg-secondary-rgb': `${bgSecondaryRgb.r}, ${bgSecondaryRgb.g}, ${bgSecondaryRgb.b}`,
@@ -125,6 +129,10 @@ export const generateRandomTheme = (): Theme => {
         '--color-text-primary': rgbToHex(textPrimaryRgb),
         '--color-text-secondary': rgbToHex(textSecondaryRgb),
         '--color-border-primary': rgbToHex(borderRgb),
+        '--color-input-bg-rgb': `${inputBgRgb.r}, ${inputBgRgb.g}, ${inputBgRgb.b}`,
+        '--color-input-border': rgbToHex(inputBorderRgb),
+        '--color-input-text': rgbToHex(textPrimaryRgb),
+        '--color-input-placeholder': rgbToHex(textSecondaryRgb),
         '--color-danger': rgbToHex(dangerRgb),
         '--color-success': rgbToHex(successRgb),
         '--color-warning': rgbToHex(warningRgb),

@@ -68,7 +68,16 @@ const ThemeEditor: React.FC<ThemeEditorProps> = ({ isOpen, onClose, customThemes
 
     const handleLoadThemeForEdit = (theme: CustomTheme) => {
         setThemeName(theme.name);
-        setColors(theme.colors);
+
+        // Sanitize the loaded theme's colors to remove null/undefined values
+        const sanitizedColors = Object.entries(theme.colors).reduce((acc, [key, value]) => {
+            if (value !== null && value !== undefined) {
+                acc[key as keyof typeof acc] = value;
+            }
+            return acc;
+        }, {} as { [key: string]: string });
+        
+        setColors({ ...themes.dark, ...sanitizedColors }); // Merge sanitized colors over defaults
         setEditingThemeId(theme.id);
         setBackgroundImage(theme.backgroundImage);
         setUiOpacity(theme.uiOpacity ?? 1);
@@ -202,7 +211,7 @@ const ThemeEditor: React.FC<ThemeEditorProps> = ({ isOpen, onClose, customThemes
                                 value={themeName}
                                 onChange={(e) => setThemeName(e.target.value)}
                                 placeholder="My Awesome Theme"
-                                className="w-full p-2 bg-bg-tertiary border border-border-primary rounded-md text-text-primary placeholder-text-secondary/70 focus:ring-2 focus:ring-accent"
+                                className="w-full p-2 bg-input-bg border border-input-border rounded-md text-input-text placeholder-input-placeholder/70 focus:ring-2 focus:ring-accent"
                             />
                         </div>
                         <div className="space-y-3 p-4 bg-bg-primary/50 rounded-md">
@@ -230,7 +239,7 @@ const ThemeEditor: React.FC<ThemeEditorProps> = ({ isOpen, onClose, customThemes
                                         <input
                                             id={variable}
                                             type="color"
-                                            value={value}
+                                            value={value || '#000000'}
                                             onChange={(e) => handleColorChange(variable, e.target.value)}
                                             className="w-8 h-8 p-0 border-none bg-transparent cursor-pointer"
                                             aria-label={`Select color for ${label}`}

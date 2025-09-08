@@ -1,11 +1,13 @@
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import type { ImageConfig, SavedStylePreset, CustomStylePreset, SafetyCheckResult, CustomTheme, StatusMessage as StatusMessageProps, ComfyUIWorkflowPreset, GenerationHistoryEntry } from '../types';
-import { generateImagesFromPrompt, postProcessImage, ENHANCE_PROMPT, FACE_FIX_PROMPT, UPSCALE_PROMPT, REMOVE_WATERMARK_PROMPT, enhancePromptWithGemini, checkPromptSafety } from '../services/geminiService';
+import type { ImageConfig, SavedStylePreset, CustomStylePreset, SafetyCheckResult, CustomTheme, StatusMessage as StatusMessageProps, ComfyUIWorkflowPreset, GenerationHistoryEntry, TagCategories, GenerationRecipe } from '../types';
+import { generateImagesFromPrompt, postProcessImage, ENHANCE_PROMPT, FACE_FIX_PROMPT, UPSCALE_PROMPT, REMOVE_WATERMARK_PROMPT, enhancePromptWithGemini, checkPromptSafety, suggestNegativePrompt } from '../services/geminiService';
 import * as comfyuiService from '../services/comfyuiService';
+import * as dbService from '../services/dbService';
 import Header from './Header';
 import ImagePromptForm from './ImagePromptForm';
 import ImageDisplay from './ImageDisplay';
-import StatusMessage from './ErrorMessage';
+import StatusMessage from './StatusMessage';
 import Footer from './Footer';
 import useLocalStorage from '../hooks/useLocalStorage';
 import StyleManager from './StyleManager';
@@ -13,10 +15,18 @@ import MagicEditModal from './MagicEditModal';
 import { themes } from '../lib/themes';
 import ThemeEditor from './ThemeEditor';
 import ComfyUIGuideModal from './ComfyUIGuideModal';
-import { getComfyPrompt } from '../lib/promptBuilder';
 import ComfyUIWorkflowManager from './ComfyUIWorkflowManager';
 import ComfyUIEmbedModal from './ComfyUIEmbedModal';
 import HistoryModal from './HistoryModal';
+import TagManagerModal from './TagManagerModal';
+import { initialManagedTags, popularCommunityTags } from '../lib/tags';
+import NegativePromptGuideModal from './NegativePromptGuideModal';
+import CheckpointManagerModal from './CheckpointManagerModal';
+import WorkflowPreviewModal from './WorkflowPreviewModal';
+import RecipeManagerModal from './RecipeManagerModal';
+import { getComfyPrompt } from '../lib/promptBuilder';
+
+const MAX_HISTORY_SIZE = 50; // Cap history to prevent storage quota errors
 
 const ratGifs = [
   {
@@ -97,15 +107,22 @@ const App: React.FC = () => {
     model: "gemini-2.5-flash-image-preview",
     detailLevel: 0,
     styleIntensity: 0,
-    selectedComfyUiWorkflowId: 'default-t2i',
-    selectedComfyUiCheckpoint: ''
+    selectedComfyUiWorkflowId: 'default-t2i-simple',
+    selectedComfyUiCheckpoint: '',
+    width: 1024,
+    height: 1024,
+    cfg: 5.0,
+    comfyUiSeed: Math.floor(Math.random() * 1e15),
+    comfyUiSeedControl: 'fixed',
+    loras: [{ id: crypto.randomUUID(), name: '', strength: 1.0 }],
   });
-  const [history, setHistory] = useLocalStorage<GenerationHistoryEntry[]>('generation-history', []);
+  const [history, setHistory] = useState<GenerationHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
+  const [isSuggestingNegative, setIsSuggestingNegative] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<StatusMessageProps | null>(null);
   const [uploadedImage, setUploadedImage] = useState<{ data: string, mimeType: string } | null>(null);
-  const [processingIndex, setProcessingIndex] = useState<number | null>(null);
+  const [processingIndex, setProcessingIndex] = useState<string | null>(null);
   const [isCheckingSafety, setIsCheckingSafety] = useState<boolean>(false);
   const [safetyCheckResult, setSafetyCheckResult] = useState<SafetyCheckResult | null>(null);
   
@@ -114,20 +131,25 @@ const App: React.FC = () => {
   const [isComfyGuideOpen, setIsComfyGuideOpen] = useState(false);
   const [comfyUiStatus, setComfyUiStatus] = useState<'idle' | 'checking' | 'online' | 'offline'>('idle');
   const [comfyUiWorkflows, setComfyUiWorkflows] = useLocalStorage<ComfyUIWorkflowPreset[]>('comfy-workflows', [
-    { id: 'default-t2i', name: 'Default Text-to-Image', workflowJson: comfyuiService.DEFAULT_T2I_WORKFLOW_API },
+    { id: 'default-t2i-simple', name: 'Default Text-to-Image', workflowJson: comfyuiService.DEFAULT_T2I_SIMPLE_WORKFLOW_API },
+    { id: 'default-t2i-single-lora', name: 'Default Text-to-Image (Single LoRA)', workflowJson: comfyuiService.DEFAULT_T2I_SINGLE_LORA_WORKFLOW_API },
+    { id: 'default-t2i-rgthree', name: 'Default Text-to-Image (rgthree LoRA)', workflowJson: comfyuiService.DEFAULT_T2I_WORKFLOW_API },
     { id: 'default-i2i', name: 'Default Image-to-Image', workflowJson: comfyuiService.DEFAULT_I2I_WORKFLOW_API },
   ]);
   const [isWorkflowManagerOpen, setIsWorkflowManagerOpen] = useState(false);
+  const [workflowToPreview, setWorkflowToPreview] = useState<string | null>(null);
   const [comfyUiCheckpoints, setComfyUiCheckpoints] = useState<string[]>([]);
-  const [comfyUiProgress, setComfyUiProgress] = useState<{ value: number; max: number } | null>(null);
-  const [comfyUiInputImage, setComfyUiInputImage] = useState<string | null>(null);
+  const [comfyUiLoras, setComfyUiLoras] = useLocalStorage<string[]>('comfy-loras', []);
+  const [hiddenCheckpoints, setHiddenCheckpoints] = useLocalStorage<string[]>('hidden-comfy-checkpoints', []);
   const [isComfyEmbedOpen, setIsComfyEmbedOpen] = useState(false);
+  const [sendingToComfyId, setSendingToComfyId] = useState<string | null>(null);
+  const [nodeToCopy, setNodeToCopy] = useState<string | null>(null);
   
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
-  const [magicEditState, setMagicEditState] = useState<{ isOpen: boolean; imageIndex: number | null; imageData: string | null; isLoading: boolean }>({
+  const [magicEditState, setMagicEditState] = useState<{ isOpen: boolean; imageId: string | null; imageData: string | null; isLoading: boolean }>({
     isOpen: false,
-    imageIndex: null,
+    imageId: null,
     imageData: null,
     isLoading: false,
   });
@@ -137,6 +159,15 @@ const App: React.FC = () => {
   const [savedPresets, setSavedPresets] = useLocalStorage<SavedStylePreset[]>('style-presets', []);
   const [customStyles, setCustomStyles] = useLocalStorage<CustomStylePreset[]>('custom-styles', []);
   const [isStyleManagerOpen, setIsStyleManagerOpen] = useState(false);
+  
+  const [recipes, setRecipes] = useLocalStorage<GenerationRecipe[]>('generation-recipes', []);
+  const [defaultRecipeId, setDefaultRecipeId] = useLocalStorage<string | null>('default-recipe-id', null);
+  const [isRecipeManagerOpen, setIsRecipeManagerOpen] = useState(false);
+  
+  const [managedTags, setManagedTags] = useLocalStorage<TagCategories>('managed-tags', initialManagedTags);
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+  const [isNegativeGuideOpen, setIsNegativeGuideOpen] = useState(false);
+  const [isCheckpointManagerOpen, setIsCheckpointManagerOpen] = useState(false);
 
   const [customThemes, setCustomThemes] = useLocalStorage<CustomTheme[]>('custom-themes', []);
   const [theme, setTheme] = useLocalStorage<string>('app-theme', 'rat');
@@ -147,6 +178,81 @@ const App: React.FC = () => {
   const [visibleRatGifs, setVisibleRatGifs] = useState<string[]>([]);
   const [resetTargetClicks, setResetTargetClicks] = useState<number | null>(null);
   const [resetCurrentClicks, setResetCurrentClicks] = useState(0);
+
+  // Load history from IndexedDB on startup
+  useEffect(() => {
+    const loadHistory = async () => {
+        try {
+            const loadedHistory = await dbService.getAllHistory();
+            setHistory(loadedHistory.slice(0, MAX_HISTORY_SIZE));
+        } catch (error) {
+            console.error("Failed to load history from IndexedDB:", error);
+            setStatusMessage({ text: 'Could not load generation history.', type: 'error' });
+        }
+    };
+    loadHistory();
+  }, []);
+
+  // Load default recipe on initial app start
+  useEffect(() => {
+    // We check if history is empty to ensure this only runs on a fresh session,
+    // not on a page reload where the user might have already changed settings.
+    if (defaultRecipeId && history.length === 0) {
+      const defaultRecipe = recipes.find(r => r.id === defaultRecipeId);
+      if (defaultRecipe) {
+        setPrompt(defaultRecipe.prompt);
+        setConfig(defaultRecipe.config);
+        setStatusMessage({ text: `Loaded default recipe: "${defaultRecipe.name}"`, type: 'info' });
+      }
+    }
+  }, [defaultRecipeId, recipes]); // history is removed as it would re-trigger on generation
+
+  // One-time sync for community tags on first load
+  useEffect(() => {
+    const communityTagsSyncedFlag = 'communityTagsSynced_v1'; // Versioned flag in case we want to force a re-sync later
+
+    if (localStorage.getItem(communityTagsSyncedFlag)) {
+        return; // Already synced, do nothing.
+    }
+
+    const normalizeString = (str: string) => str.toLowerCase().replace(/[\s_&]+/g, '');
+
+    const findMatchingCategory = (filename: string, categories: string[]): string | null => {
+        const normalizedFilename = normalizeString(filename.replace(/\.[^/.]+$/, "")); // remove extension
+        for (const category of categories) {
+            if (normalizeString(category) === normalizedFilename) {
+                return category;
+            }
+        }
+        return null;
+    };
+    
+    // Use the updater form of setState to get the most recent tags
+    setManagedTags(currentTags => {
+        const updatedTags: TagCategories = JSON.parse(JSON.stringify(currentTags)); // Deep copy to avoid mutation
+        const existingCategoryKeys = Object.keys(updatedTags);
+
+        for (const category in popularCommunityTags) {
+            const newTagsForCategory = popularCommunityTags[category as keyof typeof popularCommunityTags];
+            const matchedCategory = findMatchingCategory(category, existingCategoryKeys);
+
+            if (matchedCategory) {
+                // Merge with existing category, avoiding duplicates
+                const merged = new Set([...updatedTags[matchedCategory], ...newTagsForCategory]);
+                updatedTags[matchedCategory] = Array.from(merged).sort();
+            } else {
+                // Add as a new category
+                updatedTags[category] = Array.from(new Set(newTagsForCategory)).sort();
+            }
+        }
+        return updatedTags;
+    });
+
+    // Inform the user and set the flag
+    setStatusMessage({ text: '✨ Your tag library has been automatically updated with thousands of new community tags!', type: 'info' });
+    localStorage.setItem(communityTagsSyncedFlag, 'true');
+    
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   const handleHeaderClick = () => {
     // If all GIFs are already visible, we enter reset mode.
@@ -184,15 +290,25 @@ const App: React.FC = () => {
       setComfyUiStatus('online');
       const checkpoints = await comfyuiService.getCheckpoints(comfyUiServerAddress);
       setComfyUiCheckpoints(checkpoints);
-      if (checkpoints.length > 0 && (!config.selectedComfyUiCheckpoint || !checkpoints.includes(config.selectedComfyUiCheckpoint))) {
-        setConfig(c => ({...c, selectedComfyUiCheckpoint: checkpoints[0]}));
+      
+      const loras = await comfyuiService.getLoras(comfyUiServerAddress);
+      setComfyUiLoras(loras);
+
+      const visibleCheckpoints = checkpoints.filter(c => !hiddenCheckpoints.includes(c));
+      const currentSelectionIsValid = config.selectedComfyUiCheckpoint && visibleCheckpoints.includes(config.selectedComfyUiCheckpoint);
+
+      if (!currentSelectionIsValid) {
+          // By resetting to '', we allow the dropdown to show a placeholder.
+          // This prompts the user to make an explicit choice.
+          setConfig(c => ({ ...c, selectedComfyUiCheckpoint: '' }));
       }
     } catch (e) {
       setComfyUiStatus('offline');
       setComfyUiCheckpoints([]);
+      setComfyUiLoras([]);
       setStatusMessage({ text: 'Could not connect to ComfyUI server. Ensure it is running with --enable-cors argument.', type: 'error' });
     }
-  }, [comfyUiServerAddress, config.selectedComfyUiCheckpoint]);
+  }, [comfyUiServerAddress, config.selectedComfyUiCheckpoint, hiddenCheckpoints, setConfig]);
 
   useEffect(() => {
     if (config.model === 'comfyui-local' && comfyUiStatus === 'idle') {
@@ -204,31 +320,45 @@ const App: React.FC = () => {
     const root = window.document.documentElement;
     const body = window.document.body;
     let themeToApply: { colors: { [key: string]: string }, backgroundImage?: string, uiOpacity?: number };
+    const baseColors = themes.dark; // Use dark as a reliable fallback
 
     if (previewTheme) {
         themeToApply = {
-            colors: previewTheme.colors || themes.dark,
+            colors: { ...baseColors, ...(previewTheme.colors || {}) },
             backgroundImage: previewTheme.backgroundImage,
             uiOpacity: previewTheme.uiOpacity,
         };
     } else {
         const activeBuiltInTheme = themes[theme];
         const activeCustomTheme = customThemes.find(t => t.id === theme);
-        if (activeBuiltInTheme) {
-            themeToApply = { colors: activeBuiltInTheme, uiOpacity: 1, backgroundImage: '' };
-        } else if (activeCustomTheme) {
+        
+        if (activeCustomTheme) {
+            // Sanitize to prevent errors from old/malformed themes in localStorage
+            const sanitizedColors = Object.entries(activeCustomTheme.colors).reduce((acc, [key, value]) => {
+                if (value !== null && value !== undefined) {
+                    acc[key as keyof typeof acc] = value;
+                }
+                return acc;
+            }, {} as { [key: string]: string });
+
             themeToApply = {
-                colors: activeCustomTheme.colors,
+                colors: { ...baseColors, ...sanitizedColors },
                 backgroundImage: activeCustomTheme.backgroundImage || '',
                 uiOpacity: activeCustomTheme.uiOpacity ?? 1,
             };
+        } else if (activeBuiltInTheme) {
+            themeToApply = { colors: activeBuiltInTheme, uiOpacity: 1, backgroundImage: '' };
         } else { 
             themeToApply = { colors: themes.dark, uiOpacity: 1, backgroundImage: '' };
             setTheme('dark'); 
         }
     }
 
-    Object.entries(themeToApply.colors).forEach(([key, value]) => root.style.setProperty(key, value));
+    Object.entries(themeToApply.colors).forEach(([key, value]) => {
+      if (value) {
+        root.style.setProperty(key, value);
+      }
+    });
     body.style.backgroundImage = themeToApply.backgroundImage ? `url(${themeToApply.backgroundImage})` : '';
     body.style.backgroundSize = 'cover'; body.style.backgroundPosition = 'center'; body.style.backgroundAttachment = 'fixed';
     root.style.setProperty('--ui-opacity', String(themeToApply.uiOpacity ?? 1));
@@ -236,16 +366,83 @@ const App: React.FC = () => {
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) { setStatusMessage({text: "Please enter a prompt.", type: 'error' }); return; }
-    if (config.model === 'comfyui-local') { return; /* Disabled */ }
     setIsLoading(true); setStatusMessage(null); setSafetyCheckResult(null);
     try {
       const generatedDataUrls = await generateImagesFromPrompt(prompt, config, uploadedImage, customStyles);
-      const newEntries = generatedDataUrls.map(url => ({ id: crypto.randomUUID(), imageDataUrl: url, prompt, config: {...config}, uploadedImage, comfyUiInputImage: null }));
-      setHistory(prev => [...newEntries, ...prev]);
+      const newEntries: GenerationHistoryEntry[] = generatedDataUrls.map(url => ({ 
+          id: crypto.randomUUID(), 
+          imageDataUrl: url, 
+          prompt, 
+          config: {...config}, 
+          uploadedImage,
+          timestamp: Date.now()
+      }));
+      await dbService.addMultipleHistoryEntries(newEntries);
+      setHistory(prev => [...newEntries, ...prev].slice(0, MAX_HISTORY_SIZE));
     } catch (err) {
       setStatusMessage({ text: err instanceof Error ? err.message : 'An unknown error occurred.', type: 'error' });
     } finally { setIsLoading(false); }
-  }, [prompt, config, uploadedImage, customStyles, setHistory]);
+  }, [prompt, config, uploadedImage, customStyles]);
+
+  const handlePrimarySubmit = useCallback(() => {
+    if (config.model === 'comfyui-local') {
+      // In-app generation for ComfyUI is disabled.
+      // This function should not be called if the button is correctly disabled.
+      // This is a safeguard.
+      setStatusMessage({ text: 'Queueing is disabled for ComfyUI. Please use the full interface.', type: 'warning' });
+      return;
+    }
+    handleGenerate();
+  }, [config.model, handleGenerate]);
+  
+  const handleQueueComfyInBackground = async () => {
+    setStatusMessage({ text: 'Queueing prompt in ComfyUI...', type: 'info' });
+    try {
+        const workflowPreset = comfyUiWorkflows.find(w => w.id === config.selectedComfyUiWorkflowId);
+        if (!workflowPreset) {
+            throw new Error("Selected workflow not found.");
+        }
+        if (!config.selectedComfyUiCheckpoint) {
+            throw new Error("Please select a ComfyUI checkpoint model first.");
+        }
+
+        const comfyPrompt = getComfyPrompt(prompt, config, customStyles);
+
+        await comfyuiService.queuePromptInBackground(
+            comfyUiServerAddress,
+            workflowPreset.workflowJson,
+            comfyPrompt,
+            config.negativePrompt,
+            config.selectedComfyUiCheckpoint,
+            config.batchSize,
+            config.width ?? 1024,
+            config.height ?? 1024,
+            config.comfyUiSeed,
+            config.loras,
+            config.cfg
+        );
+
+        setStatusMessage({ text: '✅ Prompt successfully queued in ComfyUI. Generation is running in the background.', type: 'success' });
+        
+        // Update seed based on control setting AFTER successful queue
+        setConfig(c => {
+            switch(c.comfyUiSeedControl) {
+                case 'increment':
+                    return { ...c, comfyUiSeed: c.comfyUiSeed + 1 };
+                case 'decrement':
+                    return { ...c, comfyUiSeed: c.comfyUiSeed - 1 };
+                case 'randomize':
+                    return { ...c, comfyUiSeed: Math.floor(Math.random() * 1e15) };
+                case 'fixed':
+                default:
+                    return c;
+            }
+        });
+
+    } catch (e) {
+        setStatusMessage({ text: e instanceof Error ? e.message : 'Failed to queue prompt.', type: 'error' });
+    }
+  };
 
   const handleEnhancePrompt = useCallback(async () => {
     if (!prompt.trim()) return;
@@ -257,6 +454,33 @@ const App: React.FC = () => {
     } finally { setIsEnhancing(false); }
   }, [prompt]);
 
+  const handleSuggestNegativePrompt = useCallback(async () => {
+    if (!prompt.trim()) return;
+    setIsSuggestingNegative(true);
+    setStatusMessage({ text: 'Generating negative prompt suggestions...', type: 'info' });
+    try {
+      const suggestion = await suggestNegativePrompt(prompt);
+      setConfig(prevConfig => {
+        // Create a set of existing tags for easy de-duplication
+        const existingTags = new Set(prevConfig.negativePrompt.split(',').map(t => t.trim()).filter(Boolean));
+        
+        // Add new suggested tags to the set
+        const suggestedTags = suggestion.split(',').map(t => t.trim()).filter(Boolean);
+        suggestedTags.forEach(tag => existingTags.add(tag));
+        
+        // Convert back to a string
+        const newNegativePrompt = Array.from(existingTags).join(', ');
+        
+        return { ...prevConfig, negativePrompt: newNegativePrompt };
+      });
+      setStatusMessage({ text: 'Negative prompt updated with suggestions.', type: 'success' });
+    } catch (err) {
+      setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
+    } finally {
+      setIsSuggestingNegative(false);
+    }
+  }, [prompt, setConfig]);
+
   const handleCheckPromptSafety = useCallback(async () => {
     if (!prompt.trim()) return;
     setIsCheckingSafety(true); setStatusMessage(null);
@@ -266,43 +490,88 @@ const App: React.FC = () => {
     } finally { setIsCheckingSafety(false); }
   }, [prompt]);
 
-  const handlePostProcess = useCallback(async (index: number, processPrompt: string) => {
-    setProcessingIndex(index); setStatusMessage(null);
+  const handlePostProcess = useCallback(async (id: string, imageUrl: string, processPrompt: string) => {
+    setProcessingIndex(id);
+    setStatusMessage(null);
     try {
-        const imageToProcess = history[index];
-        const newImage = await postProcessImage(imageToProcess.imageDataUrl, processPrompt);
-        const newEntry = { ...imageToProcess, id: crypto.randomUUID(), imageDataUrl: newImage, prompt: `Post-process: ${processPrompt}` };
-        const updatedHistory = history.map((item, i) => i === index ? newEntry : item);
-        setHistory(updatedHistory);
-    } catch (err) { setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
-    } finally { setProcessingIndex(null); }
-  }, [history, setHistory]);
+        const newImage = await postProcessImage(imageUrl, processPrompt);
+        
+        const originalEntry = history.find(entry => entry.id === id);
+        if (!originalEntry) return;
+
+        const newEntry: GenerationHistoryEntry = { 
+            ...originalEntry, 
+            id: crypto.randomUUID(), 
+            imageDataUrl: newImage, 
+            prompt: `Post-process: ${processPrompt}`,
+            timestamp: Date.now()
+        };
+
+        await dbService.addHistoryEntry(newEntry);
+        await dbService.deleteHistoryEntry(id);
+
+        setHistory(currentHistory => {
+            const index = currentHistory.findIndex(entry => entry.id === id);
+            if (index === -1) return currentHistory; 
+            const updatedHistory = [...currentHistory];
+            updatedHistory[index] = newEntry;
+            return updatedHistory;
+        });
+    } catch (err) { 
+        setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
+    } finally { 
+        setProcessingIndex(null); 
+    }
+  }, [history]);
   
-  const handleMagicEditSubmit = async (editPrompt: string) => {
-    if (!editPrompt || magicEditState.imageIndex === null) return;
-    setMagicEditState(prev => ({ ...prev, isLoading: true })); setStatusMessage(null);
+  const handleMagicEditSubmit = useCallback(async (editPrompt: string) => {
+    if (!editPrompt || !magicEditState.imageData || !magicEditState.imageId) return;
+    const { imageId, imageData } = magicEditState;
+
+    setMagicEditState(prev => ({ ...prev, isLoading: true }));
+    setStatusMessage(null);
     try {
-      const imageToProcess = history[magicEditState.imageIndex];
-      const newImage = await postProcessImage(imageToProcess.imageDataUrl, editPrompt);
-      const newEntry = { ...imageToProcess, id: crypto.randomUUID(), imageDataUrl: newImage, prompt: `Magic Edit: ${editPrompt}` };
-      const updatedHistory = history.map((item, i) => i === magicEditState.imageIndex ? newEntry : item);
-      setHistory(updatedHistory);
-      setMagicEditState({ isOpen: false, imageIndex: null, imageData: null, isLoading: false });
+      const newImage = await postProcessImage(imageData, editPrompt);
+      
+      const originalEntry = history.find(entry => entry.id === imageId);
+      if (!originalEntry) return;
+
+      const newEntry: GenerationHistoryEntry = { 
+          ...originalEntry, 
+          id: crypto.randomUUID(), 
+          imageDataUrl: newImage, 
+          prompt: `Magic Edit: ${editPrompt}`,
+          timestamp: Date.now()
+      };
+
+      await dbService.addHistoryEntry(newEntry);
+      await dbService.deleteHistoryEntry(imageId);
+      
+      setHistory(currentHistory => {
+        const index = currentHistory.findIndex(entry => entry.id === imageId);
+        if (index === -1) return currentHistory;
+
+        const updatedHistory = [...currentHistory];
+        updatedHistory[index] = newEntry;
+        return updatedHistory;
+      });
+
+      setMagicEditState({ isOpen: false, imageData: null, imageId: null, isLoading: false });
     } catch (err) {
       setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
       setMagicEditState(prev => ({ ...prev, isLoading: false }));
     }
-  };
+  }, [history, magicEditState.imageId, magicEditState.imageData]);
 
-  const handleEnhanceImage = (index: number) => handlePostProcess(index, ENHANCE_PROMPT);
-  const handleFixFace = (index: number) => handlePostProcess(index, FACE_FIX_PROMPT);
-  const handleUpscaleImage = (index: number) => handlePostProcess(index, UPSCALE_PROMPT);
-  const handleRemoveWatermark = (index: number) => handlePostProcess(index, REMOVE_WATERMARK_PROMPT);
-  const handleOpenMagicEdit = (index: number) => {
+  const handleEnhanceImage = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, ENHANCE_PROMPT);
+  const handleFixFace = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, FACE_FIX_PROMPT);
+  const handleUpscaleImage = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, UPSCALE_PROMPT);
+  const handleRemoveWatermark = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, REMOVE_WATERMARK_PROMPT);
+  const handleOpenMagicEdit = (id: string, imageUrl: string) => {
     setMagicEditState({
       isOpen: true,
-      imageIndex: index,
-      imageData: history[index].imageDataUrl,
+      imageData: imageUrl,
+      imageId: id,
       isLoading: false,
     });
   };
@@ -314,6 +583,25 @@ const App: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+  
+  const handleCopyImage = async (imageDataUrl: string) => {
+      try {
+          if (!navigator.clipboard?.write) {
+              throw new Error("Clipboard API not available. Your browser might be blocking it or be outdated.");
+          }
+          const response = await fetch(imageDataUrl);
+          const blob = await response.blob();
+          await navigator.clipboard.write([
+              new ClipboardItem({
+                  [blob.type]: blob
+              })
+          ]);
+          setStatusMessage({ text: 'Image copied to clipboard.', type: 'success' });
+      } catch (err) {
+          console.error('Failed to copy image:', err);
+          setStatusMessage({ text: 'Could not copy image. This feature may not be supported by your browser.', type: 'error' });
+      }
   };
   
   const handleUseAsInput = async (imageData: string) => {
@@ -331,23 +619,45 @@ const App: React.FC = () => {
     }
   };
   
-  const handleSetComfyInputImage = useCallback((imageData: string) => {
-    setComfyUiInputImage(imageData);
-    setConfig(c => ({...c, model: 'comfyui-local'}));
-    setStatusMessage({text: 'Image set as ComfyUI input.', type: 'info'});
-    mainRef.current?.scrollIntoView({behavior: 'smooth'});
-  }, []);
+  const handleSendToComfyCanvas = useCallback(async (id: string, imageData: string) => {
+    if (comfyUiStatus !== 'online') {
+        setStatusMessage({ text: 'ComfyUI is offline. Please check its status and refresh the connection.', type: 'error' });
+        return;
+    }
+    setSendingToComfyId(id);
+    setStatusMessage({ text: 'Uploading image and preparing node...', type: 'info' });
+    try {
+        const nodeJson = await comfyuiService.uploadAndPrepareNodeData(comfyUiServerAddress, imageData);
+        setNodeToCopy(nodeJson);
+        setStatusMessage({ 
+            text: 'Image uploaded! Opening ComfyUI...', 
+            type: 'success' 
+        });
+        setIsComfyEmbedOpen(true);
+    } catch (err) {
+        setStatusMessage({ text: err instanceof Error ? err.message : 'Failed to send image to ComfyUI.', type: 'error' });
+    } finally {
+        setSendingToComfyId(null);
+    }
+  }, [comfyUiServerAddress, comfyUiStatus]);
   
   const handleLoadFromHistory = (entry: GenerationHistoryEntry) => {
     setPrompt(entry.prompt);
     setConfig(entry.config);
     setUploadedImage(entry.uploadedImage);
-    setComfyUiInputImage(entry.comfyUiInputImage);
     setIsHistoryOpen(false);
     mainRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
   
-  const handleDeleteFromHistory = (id: string) => setHistory(prev => prev.filter(entry => entry.id !== id));
+  const handleDeleteFromHistory = async (id: string) => {
+    try {
+        await dbService.deleteHistoryEntry(id);
+        setHistory(prev => prev.filter(entry => entry.id !== id));
+    } catch (err) {
+        console.error("Failed to delete from DB", err);
+        setStatusMessage({ text: 'Could not delete item from history.', type: 'error' });
+    }
+  };
   
   const handleShare = (entry: GenerationHistoryEntry) => {
       const recipe = { prompt: entry.prompt, config: entry.config };
@@ -371,6 +681,31 @@ const App: React.FC = () => {
     setConfig(prev => ({ ...prev, styles: prev.styles.filter(s => s !== id) }));
   };
   const handleApplyPreset = (styles: string[]) => setConfig(prev => ({ ...prev, styles }));
+
+  const handleSaveRecipe = (name: string) => {
+    const newRecipe: GenerationRecipe = {
+        id: crypto.randomUUID(),
+        name,
+        prompt,
+        config: { ...config }
+    };
+    setRecipes(prev => [...prev, newRecipe]);
+  };
+  const handleDeleteRecipe = (id: string) => {
+    if (defaultRecipeId === id) {
+        setDefaultRecipeId(null);
+    }
+    setRecipes(prev => prev.filter(r => r.id !== id));
+  };
+  const handleLoadRecipe = (recipe: GenerationRecipe) => {
+    setPrompt(recipe.prompt);
+    setConfig(recipe.config);
+    setIsRecipeManagerOpen(false);
+    mainRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  const handleSetDefaultRecipe = (id: string | null) => {
+    setDefaultRecipeId(id);
+  };
 
   const handleSaveCustomTheme = (themeToSave: CustomTheme) => {
     setCustomThemes(prev => {
@@ -404,31 +739,67 @@ const App: React.FC = () => {
       setConfig(prevConfig => ({...prevConfig, selectedComfyUiWorkflowId: 'default-t2i'}));
     }
   };
-  const handleFetchLatestComfyImage = async () => {
-    setStatusMessage({ text: 'Fetching latest image from ComfyUI...', type: 'info' });
+  
+  const handleSyncComfyImages = async (options?: { closeModal?: boolean }) => {
+    setStatusMessage({ text: 'Fetching recent images from ComfyUI...', type: 'info' });
     try {
-        const imageDataUrl = await comfyuiService.fetchLatestImage(comfyUiServerAddress);
-        const newEntry: GenerationHistoryEntry = {
-            id: crypto.randomUUID(),
-            imageDataUrl,
-            prompt: 'Fetched from ComfyUI',
-            config,
-            uploadedImage: null,
-            comfyUiInputImage: null,
-        };
-        setHistory(prev => [newEntry, ...prev]);
-        setStatusMessage({ text: 'Successfully fetched latest image.', type: 'success' });
-        setIsComfyEmbedOpen(false);
+        const recentImages = await comfyuiService.fetchRecentImages(comfyUiServerAddress);
+        
+        const allDbHistory = await dbService.getAllHistory();
+        const existingFilenames = new Set(allDbHistory.map(entry => entry.comfyUiFilename).filter(Boolean));
+        
+        const newEntries = recentImages
+            .filter(img => !existingFilenames.has(img.filename))
+            // FIX: Explicitly type the new history entry to prevent TypeScript from incorrectly widening the `model` property to `string`.
+            .map((img): GenerationHistoryEntry => ({
+                id: crypto.randomUUID(),
+                imageDataUrl: img.imageDataUrl,
+                prompt: img.prompt,
+                config: { // Use current config as a template, but mark as comfy
+                    ...config,
+                    model: 'comfyui-local',
+                },
+                uploadedImage: null,
+                comfyUiWorkflow: img.workflowJson,
+                comfyUiFilename: img.filename,
+                timestamp: Date.now(),
+            }));
+
+        if (newEntries.length > 0) {
+            await dbService.addMultipleHistoryEntries(newEntries);
+            setHistory(currentHistory => [...newEntries, ...currentHistory].slice(0, MAX_HISTORY_SIZE));
+            setStatusMessage({ text: `Successfully synced ${newEntries.length} new image(s).`, type: 'success' });
+        } else {
+            setStatusMessage({ text: 'No new images to sync.', type: 'info' });
+        }
+        
+        if (options?.closeModal) {
+            setIsComfyEmbedOpen(false);
+        }
     } catch (e) {
-        setStatusMessage({ text: e instanceof Error ? e.message : 'Failed to fetch image.', type: 'error' });
+        setStatusMessage({ text: e instanceof Error ? e.message : 'Failed to sync images.', type: 'error' });
     }
   };
+  
+  const handleSelectCheckpointRequest = () => {
+    mainRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Maybe focus the select element later if we pass a ref
+  };
+
+  const handleOpenWorkflowPreview = (workflowJson: string) => {
+    setWorkflowToPreview(workflowJson);
+  };
+
   const setSelectedComfyUiWorkflowId = (id: string) => {
     setConfig(prev => ({...prev, selectedComfyUiWorkflowId: id}));
   };
   const setSelectedComfyUiCheckpoint = (checkpoint: string) => {
     setConfig(prev => ({...prev, selectedComfyUiCheckpoint: checkpoint}));
   };
+  
+  const handleCopyComplete = useCallback(() => {
+    setNodeToCopy(null);
+  }, []);
 
   return (
     <div className="min-h-screen bg-transparent text-text-primary font-sans flex flex-col">
@@ -441,9 +812,10 @@ const App: React.FC = () => {
             setPrompt={setPrompt}
             config={config}
             setConfig={setConfig}
-            onSubmit={handleGenerate}
+            onSubmit={handlePrimarySubmit}
             isLoading={isLoading}
             onOpenStyleManager={() => setIsStyleManagerOpen(true)}
+            onOpenRecipeManager={() => setIsRecipeManagerOpen(true)}
             savedPresets={savedPresets}
             customStyles={customStyles}
             onApplyPreset={handleApplyPreset}
@@ -451,6 +823,9 @@ const App: React.FC = () => {
             setUploadedImage={setUploadedImage}
             onEnhancePrompt={handleEnhancePrompt}
             isEnhancing={isEnhancing}
+            onSuggestNegativePrompt={handleSuggestNegativePrompt}
+            isSuggestingNegative={isSuggestingNegative}
+            // FIX: Corrected typo from `handleCheckSafety` to `handleCheckPromptSafety`.
             onCheckSafety={handleCheckPromptSafety}
             isCheckingSafety={isCheckingSafety}
             safetyCheckResult={safetyCheckResult}
@@ -461,33 +836,44 @@ const App: React.FC = () => {
             onOpenComfyUIEmbed={() => setIsComfyEmbedOpen(true)}
             comfyUiStatus={comfyUiStatus}
             onCheckComfyConnection={checkComfyConnection}
+            onSyncComfyImages={handleSyncComfyImages}
             comfyUiWorkflows={comfyUiWorkflows}
-            selectedComfyUiWorkflowId={config.selectedComfyUiWorkflowId}
+            selectedComfyUiWorkflowId={config.selectedComfyUiWorkflowId || ''}
             setSelectedComfyUiWorkflowId={setSelectedComfyUiWorkflowId}
             onOpenWorkflowManager={() => setIsWorkflowManagerOpen(true)}
             comfyUiCheckpoints={comfyUiCheckpoints}
-            selectedComfyUiCheckpoint={config.selectedComfyUiCheckpoint}
+            comfyUiLoras={comfyUiLoras}
+            selectedComfyUiCheckpoint={config.selectedComfyUiCheckpoint || ''}
             setSelectedComfyUiCheckpoint={setSelectedComfyUiCheckpoint}
-            comfyUiInputImage={comfyUiInputImage}
-            setComfyUiInputImage={setComfyUiInputImage}
+            managedTags={managedTags}
+            onOpenTagManager={() => setIsTagManagerOpen(true)}
+            onOpenNegativeGuide={() => setIsNegativeGuideOpen(true)}
+            onOpenCheckpointManager={() => setIsCheckpointManagerOpen(true)}
+            hiddenCheckpoints={hiddenCheckpoints}
+            onQueueComfyInBackground={handleQueueComfyInBackground}
           />
           {statusMessage && <StatusMessage message={statusMessage} />}
           <div className="mt-6">
             <ImageDisplay 
                 images={history}
                 isLoading={isLoading}
-                isComfyUiMode={config.model === 'comfyui-local'}
-                comfyUiProgress={comfyUiProgress}
+                config={config}
+                onSelectCheckpointRequest={handleSelectCheckpointRequest}
                 processingIndex={processingIndex}
+                sendingToComfyId={sendingToComfyId}
                 onDownload={handleDownloadImage}
+                onCopyImage={handleCopyImage}
                 onUseAsInput={handleUseAsInput}
-                onUseAsComfyInput={handleSetComfyInputImage}
+                onSendToComfyCanvas={handleSendToComfyCanvas}
                 onEnhance={handleEnhanceImage}
                 onFixFace={handleFixFace}
                 onUpscale={handleUpscaleImage}
                 onRemoveWatermark={handleRemoveWatermark}
                 onMagicEdit={handleOpenMagicEdit}
                 onShare={handleShare}
+                onDelete={handleDeleteFromHistory}
+                onViewWorkflow={handleOpenWorkflowPreview}
+                onRemix={handleLoadFromHistory}
              />
           </div>
         </div>
@@ -512,7 +898,7 @@ const App: React.FC = () => {
                 {rightStackedGifs.map(gif => (
                   <div
                       key={gif.id}
-                      className="w-48 h-48 rounded-lg shadow-lg bg-cover bg-center border-2 border-accent"
+                      className="w-48 h-48 rounded-md shadow-lg bg-cover bg-center border-2 border-accent"
                       style={{ backgroundImage: `url(${gif.src})` }}
                       role="img"
                       aria-label={gif.alt}
@@ -525,7 +911,7 @@ const App: React.FC = () => {
                 {leftStackedGifs.map(gif => (
                   <div
                       key={gif.id}
-                      className="w-48 h-48 rounded-lg shadow-lg bg-cover bg-center border-2 border-accent"
+                      className="w-48 h-48 rounded-md shadow-lg bg-cover bg-center border-2 border-accent"
                       style={{ backgroundImage: `url(${gif.src})` }}
                       role="img"
                       aria-label={gif.alt}
@@ -540,6 +926,17 @@ const App: React.FC = () => {
         );
       })()}
       
+      <RecipeManagerModal
+        isOpen={isRecipeManagerOpen}
+        onClose={() => setIsRecipeManagerOpen(false)}
+        recipes={recipes}
+        onSave={handleSaveRecipe}
+        onDelete={handleDeleteRecipe}
+        onLoad={handleLoadRecipe}
+        onSetDefault={handleSetDefaultRecipe}
+        defaultRecipeId={defaultRecipeId}
+        currentPrompt={prompt}
+      />
       <StyleManager 
         isOpen={isStyleManagerOpen} 
         onClose={() => setIsStyleManagerOpen(false)}
@@ -556,7 +953,7 @@ const App: React.FC = () => {
         isOpen={magicEditState.isOpen}
         isLoading={magicEditState.isLoading}
         imageData={magicEditState.imageData}
-        onClose={() => setMagicEditState({ isOpen: false, imageIndex: null, imageData: null, isLoading: false })}
+        onClose={() => setMagicEditState({ isOpen: false, imageId: null, imageData: null, isLoading: false })}
         onSubmit={handleMagicEditSubmit}
       />
       <ThemeEditor 
@@ -582,11 +979,32 @@ const App: React.FC = () => {
       />
       <ComfyUIEmbedModal 
         isOpen={isComfyEmbedOpen}
-        onClose={() => setIsComfyEmbedOpen(false)}
+        onClose={() => {
+            setIsComfyEmbedOpen(false);
+            setNodeToCopy(null);
+        }}
         serverAddress={comfyUiServerAddress}
-        onFetchImage={handleFetchLatestComfyImage}
+        onSyncImages={handleSyncComfyImages}
+        nodeToCopy={nodeToCopy}
+        onCopyComplete={handleCopyComplete}
       />
       <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} onLoad={handleLoadFromHistory} onDelete={handleDeleteFromHistory} onShare={handleShare} />
+      <TagManagerModal
+        isOpen={isTagManagerOpen}
+        onClose={() => setIsTagManagerOpen(false)}
+        tags={managedTags}
+        onUpdateTags={setManagedTags}
+        onResetToDefaults={() => setManagedTags(initialManagedTags)}
+      />
+      <NegativePromptGuideModal isOpen={isNegativeGuideOpen} onClose={() => setIsNegativeGuideOpen(false)} />
+      <CheckpointManagerModal
+        isOpen={isCheckpointManagerOpen}
+        onClose={() => setIsCheckpointManagerOpen(false)}
+        allCheckpoints={comfyUiCheckpoints}
+        hiddenCheckpoints={hiddenCheckpoints}
+        onUpdateHiddenCheckpoints={setHiddenCheckpoints}
+      />
+      <WorkflowPreviewModal isOpen={!!workflowToPreview} onClose={() => setWorkflowToPreview(null)} workflowJson={workflowToPreview} />
     </div>
   );
 };

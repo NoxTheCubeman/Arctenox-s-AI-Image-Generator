@@ -2,26 +2,27 @@ import type { ImageConfig, ArtisticStyle, CustomStylePreset } from '../types';
 
 // --- PROMPT MODIFIERS ---
 export const styleModifiers: Record<ArtisticStyle, string> = {
-    photorealistic: ', photorealistic, 8k, sharp focus, high detail',
-    anime: ', masterpiece, best quality, absurdres, highres, anime illustration, in a detailed modern anime style, beautiful detailed eyes, perfect composition, sharp lines, cinematic lighting, vibrant colors',
+    'photorealistic': ', photorealistic, 8k, sharp focus, high detail',
+    'anime': ', masterpiece, best quality, absurdres, highres, anime illustration, in a detailed modern anime style, beautiful detailed eyes, perfect composition, sharp lines, cinematic lighting, vibrant colors',
     'vibrant-anime': ', masterpiece, best quality, absurdres, highres, vibrant colors, detailed character design, cinematic lighting, Hexbloom aesthetic, beautiful detailed eyes, dynamic composition, anime key visual, trending on pixiv',
     'semi-realistic-2-5d': ', semi-realistic, 2.5d, masterpiece, best quality, ultra detailed, beautiful detailed lighting, intricate details, cinematic, trending on artstation',
     'pixai-aesthetic': ', pixai aesthetic, clean line art, vibrant, beautiful detailed eyes, perfect composition, masterpiece, best quality, highres',
     'ink-painting': ', ink wash painting, sumi-e style, traditional japanese ink, minimalist, bold brush strokes',
-    fantasy: ', epic fantasy art, digital painting, detailed, cinematic lighting',
-    cyberpunk: ', cyberpunk style, neon lighting, futuristic, cinematic, dystopian',
-    steampunk: ', steampunk aesthetic, gears and cogs, intricate details, brass and copper',
-    watercolor: ', watercolor painting style, soft edges, vibrant wash',
-    minimalist: ', minimalist style, simple, clean lines, abstract',
-    gothic: ', gothic horror style, dark, moody, atmospheric, dramatic shadows',
-    illustration: ', digital illustration, children\'s book style, vibrant, detailed',
+    'fantasy': ', epic fantasy art, digital painting, detailed, cinematic lighting',
+    // FIX: Corrected a syntax error where the value was not a valid string.
+    'cyberpunk': ', cyberpunk style, neon lighting, futuristic, cinematic, dystopian',
+    'steampunk': ', steampunk aesthetic, gears and cogs, intricate details, brass and copper',
+    'watercolor': ', watercolor painting style, soft edges, vibrant wash',
+    'minimalist': ', minimalist style, simple, clean lines, abstract',
+    'gothic': ', gothic horror style, dark, moody, atmospheric, dramatic shadows',
+    'illustration': ', digital illustration, children\'s book style, vibrant, detailed',
     '3d-model': ', 3d model, octane render, professionally rendered, trending on cgsociety',
     'low-poly': ', low poly style, 3d render, isometric, simple colors',
     'pixel-art': ', pixel art, 16-bit, retro video game style, detailed sprites',
     'comic-book': ', comic book art, american comic style, bold lines, halftone dots, vibrant',
     'line-art': ', line art, clean lines, black and white, minimalist, vector style',
-    isometric: ', isometric style, 3d render, diorama, detailed, high resolution',
-    vaporwave: ', vaporwave aesthetic, neon colors, retro-futuristic, 80s style, chrome text, glitch art',
+    'isometric': ', isometric style, 3d render, diorama, detailed, high resolution',
+    'vaporwave': ', vaporwave aesthetic, neon colors, retro-futuristic, 80s style, chrome text, glitch art',
     'ghibli-esque': ', ghibli studio art style, whimsical, hand-drawn, beautiful detailed backgrounds',
     'mecha': ', mecha design, giant robot, sci-fi, detailed mechanical parts, battle scene',
     'ukiyo-e': ', ukiyo-e style, japanese woodblock print, flat colors, distinctive line work, historical japan',
@@ -30,7 +31,7 @@ export const styleModifiers: Record<ArtisticStyle, string> = {
     'impressionism': ', impressionist painting style, small thin brush strokes, emphasis on accurate depiction of light, visible brushstrokes',
     'pop-art': ', pop art style, bold colors, blocky outlines, inspired by comic strips, andy warhol style',
     'cyber-gothic': ', cyber gothic fashion, dark ornate clothing, futuristic aesthetic, neon accents, intricate details, moody lighting',
-    anypastel: ', soft pastel colors, dreamy aesthetic, anime style, clean line art, low contrast, gentle lighting',
+    'anypastel': ', soft pastel colors, dreamy aesthetic, anime style, clean line art, low contrast, gentle lighting',
     'arc-fantasy': ', epic high fantasy, intricate armor, mythical creatures, dramatic cinematic lighting, rich colors, detailed environment art',
     'arc-rococo': ', rococo art style, ornate details, elegant, pastel palette with gold trim, elaborate aristocratic fashion, delicate',
     'cinematic': ', cinematic, dramatic lighting, wide-angle, movie still, film grain, epic',
@@ -69,11 +70,22 @@ export const styleModifiers: Record<ArtisticStyle, string> = {
     'tribal-art': ', tribal art style, indigenous patterns, geometric shapes, bold lines, earthy tones',
     'sketch': ', pencil sketch style, hand-drawn, rough lines, charcoal, black and white, sketchbook aesthetic',
     'psychedelic': ', psychedelic art, vibrant swirling colors, abstract patterns, surreal, trippy, 60s rock poster style',
-    glassmorphism: ', glassmorphism style, frosted glass effect, translucent layers, blurred background, 3d render, clean aesthetic',
+    'glassmorphism': ', glassmorphism style, frosted glass effect, translucent layers, blurred background, 3d render, clean aesthetic',
     'double-exposure': ', double exposure effect, silhouette of a person combined with a nature scene, artistic, creative photography',
     'abstract-tech': ', abstract technology, data visualization, glowing circuits, network of nodes, dark background, futuristic, complex',
     'certified-rat-style': ', cute and clean character art, soft pastel colors, wholesome, high quality illustration, polished, sfw, by KookiePum',
 
+    // New Anime Styles
+    'gachiakuta-manga': ', gachiakuta manga style, gritty detailed inkwork, dynamic composition, urban fantasy, rough textures, expressive line art',
+    'jujutsu-kaisen': ', jujutsu kaisen anime style, mappa studio, dark modern fantasy, cinematic composition, cursed energy effects, detailed action scene',
+    'chainsaw-man': ', chainsaw man anime style, mappa studio, gritty, raw, cinematic, dark horror, film grain, visceral',
+    'oshi-no-ko': ', oshi no ko anime style, doga kobo, vibrant colors, beautiful detailed star-like eyes, idol anime style, clean line art, expressive characters',
+    'frieren-anime': ', frieren beyond journeys end anime style, madhouse studio, painterly backgrounds, soft fantasy aesthetic, beautiful scenery, nostalgic, storybook illustration',
+    'dandadan-manga': ', dandadan manga style, highly dynamic, energetic line art, chaotic action, sci-fi horror comedy, bold inkwork, expressive faces',
+    'solo-leveling': ', solo leveling anime style, manhwa style, sharp line art, glowing magical effects (blue and purple), action-packed, dark fantasy, vibrant colors',
+    'blue-lock': ', blue lock anime style, intense sports manga, sharp angular lines, dynamic motion, expressive puzzle-piece eyes, high energy, dramatic shading',
+    'bocchi-the-rock': ', bocchi the rock anime style, cloverworks, cute girls doing cute things, slice of life, surreal and stylized animation, comedic, vibrant pastel colors',
+    
     // New styles
     'novelai-anime-v3': ', masterpiece, best quality, absurdres, highres, novelai anime v3 aesthetic, beautiful detailed eyes, perfect composition, anime screencap',
     'novelai-furry-diffusion': ', furry art, anthro, novelai furry diffusion aesthetic, masterpiece, best quality, absurdres, highres, detailed character design',
@@ -95,6 +107,10 @@ export const styleModifiers: Record<ArtisticStyle, string> = {
     'ethereal-anime-painting': ', soft lighting, painterly anime style, semi-realistic, 2.5D, beautiful detailed face, delicate features, ethereal, dreamy atmosphere, trending on pixiv',
     'rendered-digital-art': ', highly polished digital painting, clean line art, smooth shading and rendering, detailed character art, professional illustration, trending on artstation',
     'cel-shaded-illustration': ', cel shading, bold outlines, flat colors with minimal gradients, anime key visual style, official art, vibrant',
+    
+    // Styles from new images
+    'vibrant-abstract-painting': ', vibrant abstract painting style, expressive brush strokes, colorful blocky background, modern anime character, masterpiece',
+    'glossy-airbrushed-anime': ', glossy airbrushed anime, 2.5d style, high specularity, shiny skin, vibrant saturated colors, polished rendering, masterpiece, trending on pixiv',
 };
 
 const detailModifiers: Record<string, string> = {

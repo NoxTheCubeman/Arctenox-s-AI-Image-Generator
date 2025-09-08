@@ -1,6 +1,10 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import type { ImageConfig, AspectRatio, ArtisticStyle, ImageModel, SavedStylePreset, CustomStylePreset, SafetyCheckResult, ComfyUIWorkflowPreset } from '../types';
+import type { ImageConfig, AspectRatio, ArtisticStyle, ImageModel, SavedStylePreset, CustomStylePreset, SafetyCheckResult, ComfyUIWorkflowPreset, TagCategories, SeedControl, LoRA } from '../types';
 import { randomPrompts } from '../lib/prompts';
+import { generateRandomizedPrompt } from '../lib/tagPromptBuilder';
+import { analyzeWorkflow, WorkflowAnalysis } from '../services/comfyuiService';
+import ResizableComfyUIEmbed from './ResizableComfyUIEmbed';
 
 interface ImagePromptFormProps {
   prompt: string;
@@ -10,6 +14,7 @@ interface ImagePromptFormProps {
   onSubmit: () => void;
   isLoading: boolean;
   onOpenStyleManager: () => void;
+  onOpenRecipeManager: () => void;
   savedPresets: SavedStylePreset[];
   customStyles: CustomStylePreset[];
   onApplyPreset: (styles: string[]) => void;
@@ -17,6 +22,8 @@ interface ImagePromptFormProps {
   setUploadedImage: (image: { data: string; mimeType: string } | null) => void;
   onEnhancePrompt: () => void;
   isEnhancing: boolean;
+  onSuggestNegativePrompt: () => void;
+  isSuggestingNegative: boolean;
   onCheckSafety: () => void;
   isCheckingSafety: boolean;
   safetyCheckResult: SafetyCheckResult | null;
@@ -26,6 +33,8 @@ interface ImagePromptFormProps {
   setComfyUiServerAddress: (value: string) => void;
   onOpenComfyGuide: () => void;
   onOpenComfyUIEmbed: () => void;
+  onSyncComfyImages: (options?: { closeModal?: boolean }) => Promise<void>;
+  onQueueComfyInBackground: () => Promise<void>;
   comfyUiStatus: 'idle' | 'checking' | 'online' | 'offline';
   onCheckComfyConnection: () => void;
   comfyUiWorkflows: ComfyUIWorkflowPreset[];
@@ -33,10 +42,15 @@ interface ImagePromptFormProps {
   setSelectedComfyUiWorkflowId: (id: string) => void;
   onOpenWorkflowManager: () => void;
   comfyUiCheckpoints: string[];
+  comfyUiLoras: string[];
   selectedComfyUiCheckpoint: string;
   setSelectedComfyUiCheckpoint: (value: string) => void;
-  comfyUiInputImage: string | null;
-  setComfyUiInputImage: (image: string | null) => void;
+  // New props for Tag Manager & Guides
+  managedTags: TagCategories;
+  onOpenTagManager: () => void;
+  onOpenNegativeGuide: () => void;
+  onOpenCheckpointManager: () => void;
+  hiddenCheckpoints: string[];
 }
 
 const aspectRatios: AspectRatio[] = ["1:1", "16:9", "9:16", "4:3", "3:4"];
@@ -55,8 +69,11 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "art-deco", label: "Art Deco" },
   { value: "art-nouveau", label: "Art Nouveau" },
   { value: "baroque", label: "Baroque" },
+  { value: "blue-lock", label: "Blue Lock Anime" },
+  { value: "bocchi-the-rock", label: "Bocchi the Rock! Anime" },
   { value: "cel-shaded-illustration", label: "Cel-Shaded Illustration" },
   { value: "certified-rat-style", label: "Certified Rat's Style" },
+  { value: "chainsaw-man", label: "Chainsaw Man Anime" },
   { value: "chibi", label: "Chibi Style" },
   { value: "cinematic", label: "Cinematic" },
   { value: "civitai-concept-masterpiece", label: "Civitai Concept Masterpiece" },
@@ -67,6 +84,7 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "concept-art", label: "Concept Art" },
   { value: "cyber-gothic", label: "Cyber Gothic" },
   { value: "cyberpunk", label: "Cyberpunk" },
+  { value: "dandadan-manga", label: "Dandadan Manga" },
   { value: "danbooru-style", label: "Danbooru Tag Style" },
   { value: "double-exposure", label: "Double Exposure" },
   { value: "e621-style", label: "e621 Tag Style" },
@@ -76,8 +94,11 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "film-noir", label: "Film Noir" },
   { value: "film-grain", label: "Film Grain" },
   { value: "flatline-illus", label: "Flatline-Illus (Niji)" },
+  { value: "frieren-anime", label: "Frieren Anime" },
+  { value: "gachiakuta-manga", label: "Gachiakuta Manga" },
   { value: "ghibli-esque", label: "Ghibli-esque" },
   { value: "glassmorphism", label: "Glassmorphism" },
+  { value: "glossy-airbrushed-anime", label: "Glossy Airbrushed Anime" },
   { value: "gothic-anime", label: "Gothic Anime" },
   { value: "gothic", label: "Gothic Horror" },
   { value: "gouache", label: "Gouache Painting" },
@@ -91,6 +112,7 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "ink-painting", label: "Ink Painting" },
   { value: "vibrant-anime", label: "Ionsyx" },
   { value: "isometric", label: "Isometric" },
+  { value: "jujutsu-kaisen", label: "Jujutsu Kaisen Anime" },
   { value: "kegant-style", label: "Kegant Style" },
   { value: "line-art", label: "Line Art" },
   { value: "lo-fi", label: "Lo-fi Aesthetic" },
@@ -102,6 +124,7 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "novelai-style", label: "NovelAI Aesthetic" },
   { value: "novelai-anime-v3", label: "NovelAI Anime V3" },
   { value: "novelai-furry-diffusion", label: "NovelAI Furry Diffusion" },
+  { value: "oshi-no-ko", label: "Oshi no Ko Anime" },
   { value: "papercraft", label: "Papercraft / Cutout" },
   { value: "photorealistic", label: "Photorealistic" },
   { value: "pixel-art", label: "Pixel Art" },
@@ -121,6 +144,7 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "seaart-mecha-warrior", label: "SeaArt Mecha Warrior" },
   { value: "semi-realistic-2-5d", label: "Semi-Realistic (2.5D)" },
   { value: "sketch", label: "Sketch" },
+  { value: "solo-leveling", label: "Solo Leveling Anime/Manhwa" },
   { value: "splatter-art", label: "Splatter Art" },
   { value: "steampunk", label: "Steampunk" },
   { value: "sticker-style", label: "Sticker Style" },
@@ -128,6 +152,7 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "ukiyo-e", label: "Ukiyo-e" },
   { value: "valentine-designs", label: "Valentinedesigns' Style" },
   { value: "vaporwave", label: "Vaporwave" },
+  { value: "vibrant-abstract-painting", label: "Vibrant Abstract Painting" },
   { value: "volcanic-soul", label: "Volcanic Soul" },
   { value: "watercolor", label: "Watercolor" },
   { value: "webtoon-style", label: "Webtoon Style" },
@@ -146,32 +171,46 @@ type Capability = NoBatchCapability | BatchCapability;
 
 const modelCapabilities: Record<ImageModel, Capability> = {
     'imagen-4.0-generate-001': { maxImages: 8, aspectRatio: true, img2img: true, batch: false },
-    'gemini-2.5-flash-image-preview': { maxImages: 1, aspectRatio: true, img2img: true, batch: false },
-    'comfyui-local': { maxImages: 1, aspectRatio: false, img2img: true, batch: false },
+    'gemini-2.5-flash-image-preview': { maxImages: 8, aspectRatio: true, img2img: true, batch: false }, // Updated maxImages
+    'comfyui-local': { maxImages: 1, aspectRatio: false, img2img: true, batch: true, maxBatch: 10 },
 };
 
 const detailLevelLabels: Record<string, string> = {
-  '-3': 'Abstract',
-  '-2': 'Minimalist',
-  '-1': 'Low Detail',
+  '-5': 'Very Abstract',
+  '-4': 'Abstract',
+  '-3': 'Minimalist',
+  '-2': 'Low Detail',
+  '-1': 'Slightly Simple',
   '0': 'None (Default)',
-  '1': 'Detailed',
-  '2': 'Highly Detailed',
-  '3': 'Ornate / Hyperdetailed',
+  '1': 'Slightly Detailed',
+  '2': 'Detailed',
+  '3': 'Highly Detailed',
+  '4': 'Ornate',
+  '5': 'Hyperdetailed',
 };
 
 const intensityLevelLabels: Record<string, string> = {
-  '-5': 'Very Subtle (-5)',
-  '-4': 'Subtle (-4)',
-  '-3': 'Understated (-3)',
-  '-2': 'Softened (-2)',
+  '-10': 'Extreme Opposite (-10)',
+  '-9': 'Extreme Opposite (-9)',
+  '-8': 'Very Inverted (-8)',
+  '-7': 'Very Inverted (-7)',
+  '-6': 'Inverted Style (-6)',
+  '-5': 'Inverted Style (-5)',
+  '-4': 'Subtle Opposite (-4)',
+  '-3': 'Subtle Opposite (-3)',
+  '-2': 'Less Intense (-2)',
   '-1': 'Less Intense (-1)',
   '0': 'Default (0)',
   '1': 'Enhanced (+1)',
-  '2': 'Vibrant (+2)',
-  '3': 'Intense (+3)',
-  '4': 'Very Intense (+4)',
-  '5': 'Dramatic (+5)',
+  '2': 'Enhanced (+2)',
+  '3': 'Vibrant (+3)',
+  '4': 'Vibrant (+4)',
+  '5': 'Intense (+5)',
+  '6': 'Intense (+6)',
+  '7': 'Very Intense (+7)',
+  '8': 'Very Intense (+8)',
+  '9': 'Dramatic (+9)',
+  '10': 'Dramatic (+10)',
 };
 
 const FormSection: React.FC<{title: string; children: React.ReactNode; actions?: React.ReactNode;}> = ({ title, children, actions }) => (
@@ -229,23 +268,27 @@ const SafetyCheckResultDisplay: React.FC<{
 
 
 const ImagePromptForm: React.FC<ImagePromptFormProps> = ({ 
-    prompt, setPrompt, config, setConfig, onSubmit, isLoading, onOpenStyleManager, 
+    prompt, setPrompt, config, setConfig, onSubmit, isLoading, onOpenStyleManager, onOpenRecipeManager,
     savedPresets, customStyles, onApplyPreset, uploadedImage, setUploadedImage,
-    onEnhancePrompt, isEnhancing, onCheckSafety, isCheckingSafety, safetyCheckResult, setSafetyCheckResult,
-    comfyUiServerAddress, setComfyUiServerAddress, onOpenComfyGuide, onOpenComfyUIEmbed,
+    onEnhancePrompt, isEnhancing, onSuggestNegativePrompt, isSuggestingNegative, onCheckSafety, isCheckingSafety, safetyCheckResult, setSafetyCheckResult,
+    comfyUiServerAddress, setComfyUiServerAddress, onOpenComfyGuide, onOpenComfyUIEmbed, onSyncComfyImages, onQueueComfyInBackground,
     comfyUiStatus, onCheckComfyConnection, comfyUiWorkflows, selectedComfyUiWorkflowId,
     setSelectedComfyUiWorkflowId, onOpenWorkflowManager, comfyUiCheckpoints, 
-    selectedComfyUiCheckpoint, setSelectedComfyUiCheckpoint,
-    comfyUiInputImage, setComfyUiInputImage
+    comfyUiLoras, selectedComfyUiCheckpoint, setSelectedComfyUiCheckpoint,
+    managedTags, onOpenTagManager, onOpenNegativeGuide, onOpenCheckpointManager, hiddenCheckpoints
 }) => {
   const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
   const [styleSearchTerm, setStyleSearchTerm] = useState("");
   const styleDropdownRef = useRef<HTMLDivElement>(null);
-  const [isWorkflowImageCompatible, setIsWorkflowImageCompatible] = useState(false);
-
+  const [workflowAnalysis, setWorkflowAnalysis] = useState<WorkflowAnalysis>({ hasRgthreeLoader: false, loraLoaderNodeIds: [] });
   
   const isComfyUi = config.model === 'comfyui-local';
   const capabilities = modelCapabilities[config.model];
+  
+  const visibleCheckpoints = useMemo(() => 
+    comfyUiCheckpoints.filter(c => !hiddenCheckpoints.includes(c)),
+    [comfyUiCheckpoints, hiddenCheckpoints]
+  );
   
   const allStyles = useMemo(() => 
     [...artisticStyles, ...customStyles.map(cs => ({ value: cs.id, label: cs.name }))]
@@ -261,24 +304,31 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
   );
 
   useEffect(() => {
-    // Check if the selected ComfyUI workflow supports image input
-    if (isComfyUi && comfyUiWorkflows.length > 0) {
-      const selectedWorkflow = comfyUiWorkflows.find(w => w.id === selectedComfyUiWorkflowId);
-      if (selectedWorkflow?.workflowJson) {
-        try {
-          const workflow = JSON.parse(selectedWorkflow.workflowJson);
-          const hasLoadImageNode = Object.values(workflow).some((node: any) => 
-            node.class_type === 'LoadImage' || node._meta?.title === 'Load Image'
-          );
-          setIsWorkflowImageCompatible(hasLoadImageNode);
-        } catch (e) {
-          setIsWorkflowImageCompatible(false); // Invalid JSON
-        }
-      } else {
-        setIsWorkflowImageCompatible(false);
-      }
+    const workflowPreset = comfyUiWorkflows.find(w => w.id === selectedComfyUiWorkflowId);
+    if (workflowPreset?.workflowJson) {
+        const analysis = analyzeWorkflow(workflowPreset.workflowJson);
+        setWorkflowAnalysis(analysis);
+
+        setConfig(prevConfig => {
+            if (analysis.loraLoaderNodeIds.length > 0 && !analysis.hasRgthreeLoader) {
+                const newLoras: LoRA[] = [];
+                for (let i = 0; i < analysis.loraLoaderNodeIds.length; i++) {
+                    newLoras.push(prevConfig.loras[i] || { id: crypto.randomUUID(), name: '', strength: 1.0 });
+                }
+                if (JSON.stringify(newLoras) !== JSON.stringify(prevConfig.loras.slice(0, newLoras.length))) {
+                     return { ...prevConfig, loras: newLoras };
+                }
+            } else if (analysis.loraLoaderNodeIds.length === 0 && !analysis.hasRgthreeLoader) {
+                if (prevConfig.loras.length > 0) {
+                    return { ...prevConfig, loras: [] };
+                }
+            }
+            return prevConfig;
+        });
+    } else {
+        setWorkflowAnalysis({ hasRgthreeLoader: false, loraLoaderNodeIds: [] });
     }
-  }, [isComfyUi, selectedComfyUiWorkflowId, comfyUiWorkflows]);
+  }, [selectedComfyUiWorkflowId, comfyUiWorkflows, setConfig]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -311,20 +361,9 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
     }
   };
 
-  const handleComfyImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setComfyUiInputImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleRandomPrompt = () => {
-    const random = randomPrompts[Math.floor(Math.random() * randomPrompts.length)];
-    setPrompt(random);
+    const newPrompt = generateRandomizedPrompt(managedTags);
+    setPrompt(newPrompt);
     setSafetyCheckResult(null);
   };
   
@@ -335,10 +374,47 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
     }
   };
 
+  const handleAddLoRA = () => {
+    setConfig(prev => {
+      return {
+        ...prev,
+        loras: [...prev.loras, { id: crypto.randomUUID(), name: comfyUiLoras[0] || '', strength: 1.0 }]
+      };
+    });
+  };
+
+  const handleRemoveLoRA = (id: string) => {
+    setConfig(prev => ({
+      ...prev,
+      loras: prev.loras.filter(lora => lora.id !== id)
+    }));
+  };
+
+  const handleUpdateLoRA = (id: string, field: 'name' | 'strength', value: string | number) => {
+    setConfig(prev => ({
+      ...prev,
+      loras: prev.loras.map(lora => lora.id === id ? { ...lora, [field]: value } : lora)
+    }));
+  };
+
+  const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const newModel = e.target.value as ImageModel;
+      setConfig(prev => {
+          const newConfig = { ...prev, model: newModel };
+          if (newModel === 'comfyui-local') {
+              // Set the default workflow when switching to ComfyUI
+              newConfig.selectedComfyUiWorkflowId = 'default-t2i-simple';
+          }
+          return newConfig;
+      });
+  };
+
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="space-y-6 animate-slide-up">
         {/* Core Prompt Section */}
-        <FormSection title="Core Prompt">
+        <FormSection title="Core Prompt" actions={
+            <button type="button" onClick={onOpenRecipeManager} className="text-sm font-medium text-accent hover:text-text-primary transition-colors">Manage Recipes</button>
+        }>
              <div className="relative">
                 <textarea
                     id="prompt"
@@ -348,7 +424,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                         if (safetyCheckResult) setSafetyCheckResult(null);
                     }}
                     placeholder="e.g., A majestic bioluminescent jellyfish floating through a starry nebula..."
-                    className="w-full h-28 p-3 bg-bg-secondary/80 border border-border-primary rounded-lg text-text-primary placeholder-text-secondary/60 focus:ring-2 focus:ring-accent resize-none pr-32"
+                    className="w-full h-28 p-3 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent resize-none pr-32"
                     required
                     disabled={isLoading}
                 />
@@ -364,16 +440,43 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                      </button>
                 </div>
             </div>
+            <p className="text-xs text-warning text-center font-semibold -mt-2">
+                IMPORTANT: If you want to generate anything explicit use ComfyUI (Local).
+            </p>
+            <div className='flex justify-end -mt-2'>
+                <button type='button' onClick={onOpenTagManager} className="text-xs font-medium text-accent hover:text-text-primary transition-colors">Manage Tags</button>
+            </div>
             {config.model !== 'imagen-4.0-generate-001' && (
                 <div>
-                    <label htmlFor="negativePrompt" className="block text-sm font-medium text-text-secondary mb-1">Negative Prompt</label>
+                    <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                             <label htmlFor="negativePrompt" className="block text-sm font-medium text-text-secondary">Negative Prompt</label>
+                             <button type="button" onClick={onOpenNegativeGuide} className="text-accent rounded-full hover:bg-accent/20 w-4 h-4 text-xs flex items-center justify-center font-bold" title="Open Negative Prompt Guide">?</button>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onSuggestNegativePrompt}
+                            disabled={isLoading || isSuggestingNegative || !prompt.trim()}
+                            className="text-xs font-medium text-accent hover:text-text-primary transition-colors flex items-center gap-1 disabled:text-text-secondary/50 disabled:cursor-not-allowed"
+                            title="Suggest a negative prompt based on your core prompt"
+                        >
+                            {isSuggestingNegative ? (
+                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0V6h-1a1 1 0 110-2h1V3a1 1 0 011-1zm-1 6a1 1 0 011-1h1a1 1 0 110 2h-1a1 1 0 01-1-1zm1 3a1 1 0 00-1 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 001-1zm-1-4a1 1 0 011-1h1a1 1 0 110 2h-1a1 1 0 01-1-1z" clipRule="evenodd" />
+                                </svg>
+                            )}
+                            Suggest
+                        </button>
+                    </div>
                     <input
                         id="negativePrompt"
                         type="text"
                         value={config.negativePrompt}
                         onChange={(e) => setConfig(prev => ({ ...prev, negativePrompt: e.target.value }))}
                         placeholder="e.g., text, watermark, blurry, low quality"
-                        className="w-full p-2 bg-bg-secondary/80 border border-border-primary rounded-lg text-text-primary placeholder-text-secondary/60 focus:ring-2 focus:ring-accent disabled:bg-bg-tertiary/50 disabled:cursor-not-allowed"
+                        className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent disabled:bg-bg-tertiary/50 disabled:cursor-not-allowed"
                         disabled={isLoading}
                     />
                 </div>
@@ -392,8 +495,8 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
             <button type="button" onClick={onOpenStyleManager} className="text-sm font-medium text-accent hover:text-text-primary transition-colors">Manage Styles</button>
         }>
             <div ref={styleDropdownRef} className="relative">
-                <button type="button" onClick={() => setIsStyleDropdownOpen(prev => !prev)} disabled={isLoading} className="w-full p-3 bg-bg-secondary/80 border border-border-primary rounded-lg text-left flex justify-between items-center">
-                    <span className="truncate text-text-primary">
+                <button type="button" onClick={() => setIsStyleDropdownOpen(prev => !prev)} disabled={isLoading} className="w-full p-3 bg-input-bg border border-input-border rounded-lg text-left flex justify-between items-center">
+                    <span className="truncate text-input-text">
                         {config.styles.length > 0 
                             ? `${config.styles.length} style(s) selected` 
                             : `Select from ${allStyles.length} available styles...`
@@ -453,7 +556,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                       value={config.promptPrefix}
                       onChange={(e) => setConfig(prev => ({ ...prev, promptPrefix: e.target.value }))}
                       placeholder="e.g., An oil painting of..."
-                      className="w-full p-2 bg-bg-secondary/80 border border-border-primary rounded-lg text-text-primary placeholder-text-secondary/60 focus:ring-2 focus:ring-accent"
+                      className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent"
                       disabled={isLoading}
                   />
               </div>
@@ -465,7 +568,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                       value={config.promptSuffix}
                       onChange={(e) => setConfig(prev => ({ ...prev, promptSuffix: e.target.value }))}
                       placeholder="e.g., cinematic lighting, hyperdetailed, 8k"
-                      className="w-full p-2 bg-bg-secondary/80 border border-border-primary rounded-lg text-text-primary placeholder-text-secondary/60 focus:ring-2 focus:ring-accent"
+                      className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent"
                       disabled={isLoading}
                   />
               </div>
@@ -476,8 +579,8 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                   <input
                       id="detail"
                       type="range"
-                      min="-3"
-                      max="3"
+                      min="-5"
+                      max="5"
                       step="1"
                       value={config.detailLevel}
                       onChange={(e) => setConfig(prev => ({...prev, detailLevel: parseInt(e.target.value)}))}
@@ -497,8 +600,8 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                   <input
                       id="intensity"
                       type="range"
-                      min="-5"
-                      max="5"
+                      min="-10"
+                      max="10"
                       step="1"
                       value={config.styleIntensity}
                       onChange={(e) => setConfig(prev => ({...prev, styleIntensity: parseInt(e.target.value)}))}
@@ -522,21 +625,21 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                     <select
                         id="model"
                         value={config.model}
-                        onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value as ImageModel }))}
-                        className="w-full p-2 bg-bg-secondary/80 border border-border-primary rounded-lg text-text-primary focus:ring-2 focus:ring-accent"
+                        onChange={handleModelChange}
+                        className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text focus:ring-2 focus:ring-accent"
                         disabled={isLoading}
                     >
                         {imageModels.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                     </select>
                 </div>
-                {capabilities.aspectRatio && (
+                {capabilities.aspectRatio && !isComfyUi && (
                     <div>
                         <label htmlFor="aspectRatio" className="block text-sm font-medium text-text-secondary mb-1">Aspect Ratio</label>
                         <select
                             id="aspectRatio"
                             value={config.aspectRatio}
                             onChange={(e) => setConfig(prev => ({ ...prev, aspectRatio: e.target.value as AspectRatio }))}
-                            className="w-full p-2 bg-bg-secondary/80 border border-border-primary rounded-lg text-text-primary focus:ring-2 focus:ring-accent"
+                            className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text focus:ring-2 focus:ring-accent"
                             disabled={isLoading}
                         >
                             {aspectRatios.map(ar => <option key={ar} value={ar}>{ar}</option>)}
@@ -583,7 +686,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
            <FormSection title="ComfyUI Local Settings" actions={
                 <div className="flex items-center gap-4">
                     <button type="button" onClick={onOpenComfyUIEmbed} className="text-sm font-medium text-accent hover:text-text-primary transition-colors flex items-center gap-1">
-                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" /></svg>
+                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 7a2 2 0 012-2h10a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V7zm2-2a1 1 0 00-1 1v6a1 1 0 001 1h10a1 1 0 001-1V7a1 1 0 00-1-1H5z" clipRule="evenodd" /></svg>
                         Open Full Interface
                     </button>
                     <button type="button" onClick={onOpenComfyGuide} className="text-sm font-medium text-accent hover:text-text-primary transition-colors flex items-center gap-1">
@@ -602,7 +705,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                                 value={comfyUiServerAddress}
                                 onChange={(e) => setComfyUiServerAddress(e.target.value)}
                                 placeholder="http://127.0.0.1:8188"
-                                className="flex-grow p-2 bg-bg-secondary/80 border border-border-primary rounded-lg text-text-primary placeholder-text-secondary/60 focus:ring-2 focus:ring-accent"
+                                className="flex-grow p-2 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent"
                                 disabled={isLoading}
                             />
                             <button
@@ -625,66 +728,270 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
 
                     {comfyUiStatus === 'online' && (
                         <>
-                           <div>
-                                <label htmlFor="comfy-workflow" className="block text-sm font-medium text-text-secondary mb-1">Workflow</label>
-                                 <div className="flex items-center gap-2">
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label htmlFor="comfy-workflow" className="block text-sm font-medium text-text-secondary">Workflow</label>
+                                        <button type="button" onClick={onOpenWorkflowManager} className="text-xs font-medium text-accent hover:text-text-primary transition-colors">Manage</button>
+                                    </div>
                                     <select
                                         id="comfy-workflow"
                                         value={selectedComfyUiWorkflowId}
                                         onChange={(e) => setSelectedComfyUiWorkflowId(e.target.value)}
-                                        className="w-full p-2 bg-bg-secondary/80 border border-border-primary rounded-lg text-text-primary focus:ring-2 focus:ring-accent"
-                                        disabled={isLoading}
+                                        className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text focus:ring-2 focus:ring-accent"
+                                        disabled={isLoading || comfyUiStatus !== 'online'}
                                     >
                                         {comfyUiWorkflows.map(wf => <option key={wf.id} value={wf.id}>{wf.name}</option>)}
                                     </select>
-                                    <button type="button" onClick={onOpenWorkflowManager} className="px-4 py-2 font-semibold text-text-secondary bg-bg-tertiary/80 hover:bg-bg-tertiary rounded-md">Manage</button>
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label htmlFor="comfy-checkpoint" className="block text-sm font-medium text-text-secondary">
+                                            Checkpoint Model
+                                        </label>
+                                        <button type="button" onClick={onOpenCheckpointManager} className="text-xs font-medium text-accent hover:text-text-primary transition-colors">Manage</button>
+                                    </div>
+                                    <select
+                                        id="comfy-checkpoint"
+                                        value={selectedComfyUiCheckpoint}
+                                        onChange={(e) => setSelectedComfyUiCheckpoint(e.target.value)}
+                                        className={`w-full p-2 bg-input-bg border border-input-border rounded-lg focus:ring-2 focus:ring-accent ${!selectedComfyUiCheckpoint ? 'text-input-placeholder/80' : 'text-input-text'}`}
+                                        disabled={isLoading || comfyUiCheckpoints.length === 0 || comfyUiStatus !== 'online'}
+                                        required={isComfyUi}
+                                    >
+                                        <option value="" disabled>
+                                            {comfyUiCheckpoints.length === 0 
+                                                ? 'No models found' 
+                                                : visibleCheckpoints.length === 0
+                                                    ? `All ${comfyUiCheckpoints.length} models are hidden`
+                                                    : `Select from ${visibleCheckpoints.length} available model(s)...`
+                                            }
+                                        </option>
+                                        {visibleCheckpoints.map(cp => (
+                                            <option key={cp} value={cp}>{cp}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                           </div>
+                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-border-primary/50">
+                                <div>
+                                    <label htmlFor="width" className="block text-sm font-medium text-text-secondary mb-1">Width</label>
+                                    <input
+                                        id="width"
+                                        type="number"
+                                        step="64"
+                                        value={config.width}
+                                        onChange={(e) => setConfig(prev => ({ ...prev, width: parseInt(e.target.value, 10) || 1024 }))}
+                                        className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent"
+                                        disabled={isLoading}
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="height" className="block text-sm font-medium text-text-secondary mb-1">Height</label>
+                                    <input
+                                        id="height"
+                                        type="number"
+                                        step="64"
+                                        value={config.height}
+                                        onChange={(e) => setConfig(prev => ({ ...prev, height: parseInt(e.target.value, 10) || 1024 }))}
+                                        className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent"
+                                        disabled={isLoading}
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="cfg" className="block text-sm font-medium text-text-secondary mb-1">
+                                        CFG Scale
+                                    </label>
+                                    <input
+                                        id="cfg"
+                                        type="number"
+                                        min="1"
+                                        max="30"
+                                        step="0.1"
+                                        value={config.cfg}
+                                        onChange={(e) => {
+                                            const parsed = parseFloat(e.target.value);
+                                            if (!isNaN(parsed)) {
+                                                setConfig(prev => ({ ...prev, cfg: parsed }));
+                                            }
+                                        }}
+                                        className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text focus:ring-2 focus:ring-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        disabled={isLoading}
+                                    />
                                 </div>
                             </div>
-
-                            <div>
-                                <label htmlFor="comfy-checkpoint" className="block text-sm font-medium text-text-secondary mb-1">Checkpoint Model</label>
-                                <select
-                                    id="comfy-checkpoint"
-                                    value={selectedComfyUiCheckpoint}
-                                    onChange={(e) => setSelectedComfyUiCheckpoint(e.target.value)}
-                                    className="w-full p-2 bg-bg-secondary/80 border border-border-primary rounded-lg text-text-primary focus:ring-2 focus:ring-accent"
-                                    disabled={isLoading || comfyUiCheckpoints.length === 0}
-                                >
-                                    {comfyUiCheckpoints.length > 0 ? (
-                                        comfyUiCheckpoints.map(cp => <option key={cp} value={cp}>{cp}</option>)
-                                    ) : (
-                                        <option>No models found</option>
-                                    )}
-                                </select>
-                            </div>
                             
-                            <div className="relative">
-                                <label htmlFor="comfy-image-upload" className="block text-sm font-medium text-text-secondary mb-1">
-                                    Input Image (Optional)
-                                    <span className={`inline-block ml-2 text-xs font-bold px-2 py-0.5 rounded-full ${isWorkflowImageCompatible ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'}`} title={isWorkflowImageCompatible ? 'Selected workflow supports image input' : 'Selected workflow does not have a LoadImage node'}>
-                                      {isWorkflowImageCompatible ? '✔️ Compatible' : '⚠️ Incompatible'}
-                                    </span>
-                                </label>
-                                <input id="comfy-image-upload" type="file" accept="image/png, image/jpeg" onChange={handleComfyImageUpload} className="block w-full text-sm text-text-secondary/70 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-bg-tertiary file:text-text-primary hover:file:bg-bg-tertiary/80" disabled={!isWorkflowImageCompatible}/>
-                                {comfyUiInputImage && (
-                                     <div className="mt-2 flex items-center gap-2">
-                                        <img src={comfyUiInputImage} alt="ComfyUI input preview" className="h-16 w-16 object-cover rounded-md border border-border-primary"/>
-                                        <button type="button" onClick={() => setComfyUiInputImage(null)} className="text-danger hover:underline text-xs">Clear</button>
-                                     </div>
-                                )}
+                            {/* LoRA Section */}
+                            {(workflowAnalysis.hasRgthreeLoader || workflowAnalysis.loraLoaderNodeIds.length > 0) && (
+                                <div className="space-y-2 pt-4 border-t border-border-primary/50">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-sm font-medium text-text-secondary">LoRAs</label>
+                                        {workflowAnalysis.hasRgthreeLoader && (
+                                            <button
+                                                type="button"
+                                                onClick={handleAddLoRA}
+                                                disabled={isLoading || comfyUiLoras.length === 0}
+                                                className="text-xs font-medium text-accent hover:text-text-primary transition-colors flex items-center gap-1 disabled:text-text-secondary/50 disabled:cursor-not-allowed"
+                                            >
+                                                + Add LoRA ({config.loras.length})
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {workflowAnalysis.hasRgthreeLoader && (
+                                        <div className="space-y-3">
+                                            {comfyUiLoras.length === 0 && config.loras.length === 0 && <p className="text-xs text-text-secondary/70">No LoRAs found on ComfyUI server.</p>}
+                                            {config.loras.map((lora) => (
+                                                <div key={lora.id} className="p-3 bg-bg-primary/50 rounded-lg space-y-3 animate-fade-in">
+                                                     <div className="flex items-center gap-2">
+                                                         <select
+                                                             value={lora.name}
+                                                             onChange={(e) => handleUpdateLoRA(lora.id, 'name', e.target.value)}
+                                                             className="flex-grow p-2 bg-input-bg border border-input-border rounded-lg text-input-text focus:ring-2 focus:ring-accent text-sm"
+                                                             disabled={isLoading}
+                                                         >
+                                                             <option value="" disabled>Select a LoRA...</option>
+                                                             {comfyUiLoras.map(name => <option key={name} value={name}>{name}</option>)}
+                                                         </select>
+                                                         <button
+                                                             type="button"
+                                                             onClick={() => handleRemoveLoRA(lora.id)}
+                                                             className="text-danger/80 hover:text-danger p-2 rounded-md flex justify-center items-center flex-shrink-0"
+                                                             title="Remove LoRA"
+                                                             disabled={isLoading}
+                                                         >
+                                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" /></svg>
+                                                         </button>
+                                                     </div>
+                                                     <div className="grid grid-cols-5 gap-2 items-center">
+                                                         <label htmlFor={`lora-strength-${lora.id}`} className="col-span-2 text-sm text-text-secondary/90">Strength</label>
+                                                         <input
+                                                             id={`lora-strength-${lora.id}`}
+                                                             type="range" min="-5" max="5" step="0.01"
+                                                             value={lora.strength}
+                                                             onChange={(e) => handleUpdateLoRA(lora.id, 'strength', parseFloat(e.target.value))}
+                                                             className="col-span-2 w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb"
+                                                             disabled={isLoading}
+                                                         />
+                                                         <input
+                                                             type="number" step="0.01"
+                                                             value={lora.strength}
+                                                             onChange={(e) => handleUpdateLoRA(lora.id, 'strength', parseFloat(e.target.value))}
+                                                             className="col-span-1 w-full p-1 bg-input-bg border border-input-border rounded-md text-input-text text-sm text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                             disabled={isLoading}
+                                                         />
+                                                     </div>
+                                                 </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
+                                    {!workflowAnalysis.hasRgthreeLoader && workflowAnalysis.loraLoaderNodeIds.length > 0 && (
+                                         <div className="space-y-3">
+                                            {config.loras.map((lora, index) => (
+                                                 <div key={lora.id} className="p-3 bg-bg-primary/50 rounded-lg space-y-3 animate-fade-in">
+                                                     <p className="text-xs font-semibold text-text-secondary/80">LoRA Slot #{index + 1}</p>
+                                                     <div className="flex items-center gap-2">
+                                                         <select
+                                                             value={lora.name}
+                                                             onChange={(e) => handleUpdateLoRA(lora.id, 'name', e.target.value)}
+                                                             className="flex-grow p-2 bg-input-bg border border-input-border rounded-lg text-input-text focus:ring-2 focus:ring-accent text-sm"
+                                                             disabled={isLoading}
+                                                         >
+                                                             <option value="">(None)</option>
+                                                             {comfyUiLoras.map(name => <option key={name} value={name}>{name}</option>)}
+                                                         </select>
+                                                     </div>
+                                                     <div className="grid grid-cols-5 gap-2 items-center">
+                                                         <label htmlFor={`lora-strength-slot-${lora.id}`} className="col-span-2 text-sm text-text-secondary/90">Strength</label>
+                                                         <input
+                                                             id={`lora-strength-slot-${lora.id}`}
+                                                             type="range" min="-5" max="5" step="0.01"
+                                                             value={lora.strength}
+                                                             onChange={(e) => handleUpdateLoRA(lora.id, 'strength', parseFloat(e.target.value))}
+                                                             className="col-span-2 w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb"
+                                                             disabled={isLoading}
+                                                         />
+                                                         <input
+                                                             type="number" step="0.01"
+                                                             value={lora.strength}
+                                                             onChange={(e) => handleUpdateLoRA(lora.id, 'strength', parseFloat(e.target.value))}
+                                                             className="col-span-1 w-full p-1 bg-input-bg border border-input-border rounded-md text-input-text text-sm text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                             disabled={isLoading}
+                                                         />
+                                                     </div>
+                                                 </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="flex flex-col md:flex-row items-end gap-4 pt-4 border-t border-border-primary/50">
+                                <div className="flex-grow w-full">
+                                    <label htmlFor="comfy-seed" className="block text-sm font-medium text-text-secondary mb-1">Seed</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            id="comfy-seed"
+                                            type="number"
+                                            value={config.comfyUiSeed}
+                                            onChange={(e) => setConfig(prev => ({ ...prev, comfyUiSeed: Number(e.target.value) }))}
+                                            className="flex-grow p-2 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            disabled={isLoading}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setConfig(prev => ({ ...prev, comfyUiSeed: Math.floor(Math.random() * 1e15) }))}
+                                            disabled={isLoading}
+                                            className="p-2 font-semibold text-text-primary bg-bg-tertiary rounded-md hover:bg-accent hover:text-white transition-colors flex items-center justify-center h-full aspect-square"
+                                            title="Randomize Seed"
+                                        >
+                                            <span className="text-lg" role="img" aria-label="dice">🎲</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="w-full md:w-auto flex-shrink-0">
+                                    <label htmlFor="comfy-seed-control" className="block text-sm font-medium text-text-secondary mb-1">Control After Generate</label>
+                                    <select
+                                        id="comfy-seed-control"
+                                        value={config.comfyUiSeedControl}
+                                        onChange={(e) => setConfig(prev => ({ ...prev, comfyUiSeedControl: e.target.value as SeedControl }))}
+                                        className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text focus:ring-2 focus:ring-accent"
+                                        disabled={isLoading}
+                                    >
+                                        <option value="fixed">Fixed</option>
+                                        <option value="increment">Increment</option>
+                                        <option value="decrement">Decrement</option>
+                                        <option value="randomize">Randomize</option>
+                                    </select>
+                                </div>
                             </div>
                         </>
+                    )}
+                    {comfyUiStatus === 'online' && (
+                        <ResizableComfyUIEmbed 
+                            serverAddress={comfyUiServerAddress} 
+                            // FIX: The prop name expected by ResizableComfyUIEmbed is `onSyncImages`, but the prop available in this component is `onSyncComfyImages`.
+                            onSyncImages={onSyncComfyImages}
+                            onQueue={onQueueComfyInBackground}
+                        />
                     )}
                 </div>
            </FormSection>
         )}
         
-        {/* Img2Img Section - Only for Cloud Models with the capability */}
         {capabilities.img2img && !isComfyUi && (
             <FormSection title="Image to Image (Img2Img)">
-                <div className="p-3 bg-info-bg/50 text-info text-xs rounded-md border border-info/50">
-                    Upload an image to use as a base for your prompt. This feature uses a powerful vision model to interpret the image.
-                </div>
+                 {isComfyUi ? (
+                    <div className="p-3 bg-info-bg/50 text-info text-xs rounded-md border border-info/50">
+                        Upload an image to use as input for your workflow. Make sure your selected workflow is designed for Image-to-Image (e.g., contains a "Load Image" node).
+                    </div>
+                ) : (
+                    <div className="p-3 bg-info-bg/50 text-info text-xs rounded-md border border-info/50">
+                        Upload an image to use as a base for your prompt. This feature uses a powerful vision model to interpret the image.
+                    </div>
+                )}
                 {uploadedImage ? (
                     <div className="flex items-center gap-4">
                         <img src={uploadedImage.data} alt="Uploaded preview" className="h-20 w-20 object-cover rounded-lg border-2 border-border-primary" />
@@ -699,6 +1006,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
             </FormSection>
         )}
 
+
       <div className="flex justify-center mt-4">
         <button
           type="submit"
@@ -711,7 +1019,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
               Generating...
             </>
           ) : isComfyUi ? (
-            'Open Full Interface To Generate'
+              'Queueing Disabled - Use ComfyUI Interface'
           ) : (
             'Generate'
           )}

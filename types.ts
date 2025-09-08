@@ -1,4 +1,5 @@
 export type AspectRatio = "1:1" | "16:9" | "9:16" | "4:3" | "3:4";
+export type SeedControl = 'fixed' | 'increment' | 'decrement' | 'randomize';
 
 // FIX: Added 'novelai-style' to the type union to resolve type errors.
 export type ArtisticStyle =
@@ -6,9 +7,19 @@ export type ArtisticStyle =
   // New Styles
   | "novelai-anime-v3" | "novelai-furry-diffusion" | "civitai-epic-realism" | "civitai-concept-masterpiece" | "civitai-semi-realistic" | "seaart-exquisite-detail" | "seaart-ancient-style" | "seaart-mecha-warrior" | "pixai-moonbeam" | "pixai-realism"
   // Styles from user images
-  | "high-contrast-manga" | "volcanic-soul" | "gothic-anime" | "polished-furry" | "webtoon-style" | "ethereal-anime-painting" | "rendered-digital-art" | "cel-shaded-illustration";
+  | "high-contrast-manga" | "volcanic-soul" | "gothic-anime" | "polished-furry" | "webtoon-style" | "ethereal-anime-painting" | "rendered-digital-art" | "cel-shaded-illustration"
+  // Styles from new images
+  | "vibrant-abstract-painting" | "glossy-airbrushed-anime"
+  // New anime styles
+  | "bocchi-the-rock" | "chainsaw-man" | "dandadan-manga" | "frieren-anime" | "gachiakuta-manga" | "jujutsu-kaisen" | "oshi-no-ko" | "solo-leveling" | "blue-lock";
 
 export type ImageModel = "gemini-2.5-flash-image-preview" | "imagen-4.0-generate-001" | "comfyui-local";
+
+export interface LoRA {
+  id: string;
+  name: string;
+  strength: number;
+}
 
 export interface ImageConfig {
   numberOfImages: number;
@@ -24,6 +35,12 @@ export interface ImageConfig {
   // ComfyUI specific
   selectedComfyUiWorkflowId?: string;
   selectedComfyUiCheckpoint?: string;
+  width?: number;
+  height?: number;
+  cfg: number;
+  comfyUiSeed: number;
+  comfyUiSeedControl: SeedControl;
+  loras: LoRA[];
 }
 
 export interface GenerationHistoryEntry {
@@ -31,8 +48,11 @@ export interface GenerationHistoryEntry {
   imageDataUrl: string;
   prompt: string;
   config: ImageConfig;
+  timestamp: number;
   uploadedImage: { data: string, mimeType: string } | null;
-  comfyUiInputImage: string | null;
+  // ComfyUI sync specific
+  comfyUiWorkflow?: string;
+  comfyUiFilename?: string;
 }
 
 
@@ -71,4 +91,13 @@ export interface ComfyUIWorkflowPreset {
     id: string;
     name: string;
     workflowJson: string;
+}
+
+export type TagCategories = Record<string, string[]>;
+
+export interface GenerationRecipe {
+  id: string;
+  name: string;
+  prompt: string;
+  config: ImageConfig;
 }

@@ -3,13 +3,11 @@ import React from 'react';
 interface LoadingSpinnerProps {
     message?: string;
     subMessage?: string | undefined;
-    progress?: { value: number; max: number } | null;
 }
 
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
     message = "Generating your masterpiece...", 
     subMessage = "This can take a moment. Please wait.",
-    progress = null
 }) => {
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center text-text-secondary/80 animate-fade-in w-full">
@@ -19,14 +17,6 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         </svg>
         <p className="text-lg font-semibold">{message}</p>
         {subMessage && <p className="text-sm mb-4">{subMessage}</p>}
-        {progress && (
-            <div className="w-full max-w-sm bg-bg-tertiary rounded-full h-2.5">
-                <div 
-                    className="bg-accent h-2.5 rounded-full transition-all duration-300" 
-                    style={{ width: `${(progress.value / progress.max) * 100}%` }}
-                ></div>
-            </div>
-        )}
     </div>
   );
 };
