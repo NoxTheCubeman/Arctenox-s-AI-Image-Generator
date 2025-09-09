@@ -21,4 +21,4 @@ This application runs entirely in your browser and connects to the Google Gemini
 
 ## Deploying
 
-You can deploy this project to any static hosting service like Vercel, Netlify, or GitHub Pages. No server-side configuration is needed beyond providing the `API_KEY` environment variable to the build process.
+You can deploy this project to any static hosting service like Vercel by pasting this in your url: `arctenox-s-image-generator.vercel.app`. No server-side configuration is needed beyond providing the `API_KEY` environment variable to the build process.
