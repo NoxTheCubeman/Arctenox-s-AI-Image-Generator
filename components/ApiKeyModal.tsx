@@ -33,7 +33,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, apiKey, onSa
                 </div>
                 <div className="p-6 space-y-4">
                     <p className="text-sm text-text-secondary">
-                        Please enter your Google Gemini API key to use the generation features. Your key is saved securely in your browser's local storage and is never sent to our servers.
+                        You can enter your own Google Gemini API key to use your personal quota. If left blank, the application will use its built-in key (if available). Your key is saved securely in your browser's local storage.
                     </p>
                     <div>
                         <label htmlFor="api-key-input" className="block text-sm font-medium text-text-secondary mb-1">

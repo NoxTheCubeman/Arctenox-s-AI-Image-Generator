@@ -113,6 +113,11 @@ export const generateRandomTheme = (): Theme => {
     // Create input field colors
     const inputBgRgb = hslToRgb(baseHue, saturation, isDarkTheme ? bgL_base + 10 : bgL_base - 5);
     const inputBorderRgb = hslToRgb(baseHue, saturation, isDarkTheme ? bgL_base + 20 : bgL_base - 12);
+    
+    // Create slider colors
+    const sliderTrackRgb = bgTertiaryRgb;
+    const sliderThumbRgb = accentRgb;
+    const sliderThumbHoverRgb = accentHoverRgb;
 
     const theme: Theme = {
         '--color-bg-primary-rgb': `${bgPrimaryRgb.r}, ${bgPrimaryRgb.g}, ${bgPrimaryRgb.b}`,
@@ -137,6 +142,9 @@ export const generateRandomTheme = (): Theme => {
         '--color-success': rgbToHex(successRgb),
         '--color-warning': rgbToHex(warningRgb),
         '--color-info': rgbToHex(infoRgb),
+        '--color-slider-track-bg': rgbToHex(sliderTrackRgb),
+        '--color-slider-thumb-bg': rgbToHex(sliderThumbRgb),
+        '--color-slider-thumb-hover-bg': rgbToHex(sliderThumbHoverRgb),
     };
     return theme;
 };

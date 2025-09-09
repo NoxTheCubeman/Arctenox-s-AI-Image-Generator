@@ -2,6 +2,8 @@
 
 
 
+
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { ImageConfig, AspectRatio, ArtisticStyle, ImageModel, SavedStylePreset, CustomStylePreset, SafetyCheckResult, ComfyUIWorkflowPreset, TagCategories, SeedControl, LoRA } from '../types';
 import { randomPrompts } from '../lib/prompts';
@@ -601,7 +603,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                       step="1"
                       value={config.detailLevel}
                       onChange={(e) => setConfig(prev => ({...prev, detailLevel: parseInt(e.target.value)}))}
-                      className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb disabled:cursor-not-allowed"
+                      className="w-full h-2 bg-slider-track-bg rounded-lg appearance-none cursor-pointer range-thumb disabled:cursor-not-allowed"
                       disabled={isLoading}
                   />
                   <div className="flex justify-between text-xs text-text-secondary/70 px-1 mt-1">
@@ -622,7 +624,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                       step="1"
                       value={config.styleIntensity}
                       onChange={(e) => setConfig(prev => ({...prev, styleIntensity: parseInt(e.target.value)}))}
-                      className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb disabled:cursor-not-allowed"
+                      className="w-full h-2 bg-slider-track-bg rounded-lg appearance-none cursor-pointer range-thumb disabled:cursor-not-allowed"
                       disabled={isLoading}
                   />
                    <div className="flex justify-between text-xs text-text-secondary/70 px-1 mt-1">
@@ -674,7 +676,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                         max={capabilities.maxImages}
                         value={config.numberOfImages}
                         onChange={(e) => setConfig(prev => ({ ...prev, numberOfImages: parseInt(e.target.value, 10) }))}
-                        className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb disabled:cursor-not-allowed"
+                        className="w-full h-2 bg-slider-track-bg rounded-lg appearance-none cursor-pointer range-thumb disabled:cursor-not-allowed"
                         disabled={isLoading || capabilities.batch}
                     />
                 </div>
@@ -690,7 +692,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                             max={capabilities.maxBatch}
                             value={config.batchSize}
                             onChange={(e) => setConfig(prev => ({ ...prev, batchSize: parseInt(e.target.value, 10) }))}
-                            className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb disabled:cursor-not-allowed"
+                            className="w-full h-2 bg-slider-track-bg rounded-lg appearance-none cursor-pointer range-thumb disabled:cursor-not-allowed"
                             disabled={isLoading}
                         />
                     </div>
@@ -888,7 +890,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                                                              type="range" min="-5" max="5" step="0.01"
                                                              value={lora.strength}
                                                              onChange={(e) => handleUpdateLoRA(lora.id, 'strength', parseFloat(e.target.value))}
-                                                             className="col-span-2 w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb"
+                                                             className="col-span-2 w-full h-2 bg-slider-track-bg rounded-lg appearance-none cursor-pointer range-thumb"
                                                              disabled={isLoading}
                                                          />
                                                          <input
@@ -927,7 +929,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                                                              type="range" min="-5" max="5" step="0.01"
                                                              value={lora.strength}
                                                              onChange={(e) => handleUpdateLoRA(lora.id, 'strength', parseFloat(e.target.value))}
-                                                             className="col-span-2 w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb"
+                                                             className="col-span-2 w-full h-2 bg-slider-track-bg rounded-lg appearance-none cursor-pointer range-thumb"
                                                              disabled={isLoading}
                                                          />
                                                          <input

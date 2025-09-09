@@ -1,0 +1,48 @@
+/* index.css */
+
+/* Custom scrollbar styles for applicable elements */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(var(--color-bg-primary-rgb), var(--ui-opacity, 1));
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(var(--color-bg-tertiary-rgb), var(--ui-opacity, 1));
+    border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border-primary);
+}
+
+
+/* Slider Thumb Styles for input[type=range] with .range-thumb class */
+.range-thumb::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.25rem; /* 20px */
+    height: 1.25rem; /* 20px */
+    margin-top: -8px; /* Center thumb on an 8px high track */
+    background-color: var(--color-slider-thumb-bg);
+    cursor: pointer;
+    border-radius: 9999px;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.range-thumb:hover::-webkit-slider-thumb {
+    background-color: var(--color-slider-thumb-hover-bg);
+}
+
+.range-thumb::-moz-range-thumb {
+    width: 1.25rem;
+    height: 1.25rem;
+    background-color: var(--color-slider-thumb-bg);
+    cursor: pointer;
+    border-radius: 9999px;
+    border: 0;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.range-thumb:hover::-moz-range-thumb {
+    background-color: var(--color-slider-thumb-hover-bg);
+}

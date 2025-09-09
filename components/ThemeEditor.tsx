@@ -223,7 +223,7 @@ const ThemeEditor: React.FC<ThemeEditorProps> = ({ isOpen, onClose, customThemes
                              </div>
                              <div>
                                 <label htmlFor="ui-opacity" className="block text-sm font-medium text-text-secondary mb-1">UI Opacity: {Math.round(uiOpacity * 100)}%</label>
-                                <input id="ui-opacity" type="range" min="0.1" max="1" step="0.05" value={uiOpacity} onChange={(e) => setUiOpacity(parseFloat(e.target.value))} className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb disabled:cursor-not-allowed" disabled={!backgroundImage} />
+                                <input id="ui-opacity" type="range" min="0.1" max="1" step="0.05" value={uiOpacity} onChange={(e) => setUiOpacity(parseFloat(e.target.value))} className="w-full h-2 bg-slider-track-bg rounded-lg appearance-none cursor-pointer range-thumb disabled:cursor-not-allowed" disabled={!backgroundImage} />
                                 {!backgroundImage && <p className="text-xs text-text-secondary/50 mt-1">A background image must be selected to use opacity.</p>}
                              </div>
                         </div>

@@ -29,6 +29,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#FCD34D',
     '--color-info': '#93C5FD',
     '--color-icon-primary': '#D1D5DB',
+    '--color-slider-track-bg': '#374151',
+    '--color-slider-thumb-bg': '#007BFF',
+    '--color-slider-thumb-hover-bg': '#0056b3',
   },
   light: {
     '--color-bg-primary-rgb': '249, 250, 251',
@@ -54,6 +57,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#92400E',
     '--color-info': '#1E40AF',
     '--color-icon-primary': '#4B5563',
+    '--color-slider-track-bg': '#F3F4F6',
+    '--color-slider-thumb-bg': '#007BFF',
+    '--color-slider-thumb-hover-bg': '#0056b3',
   },
   synthwave: {
     '--color-bg-primary-rgb': '26, 16, 50',
@@ -79,6 +85,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#FFF000',
     '--color-info': '#00EFFF',
     '--color-icon-primary': '#00EFFF',
+    '--color-slider-track-bg': '#402E66',
+    '--color-slider-thumb-bg': '#FF00C1',
+    '--color-slider-thumb-hover-bg': '#990074',
   },
   forest: {
     '--color-bg-primary-rgb': '42, 63, 42',
@@ -104,6 +113,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#FFD54F',
     '--color-info': '#90CAF9',
     '--color-icon-primary': '#F0EAD6',
+    '--color-slider-track-bg': '#506B50',
+    '--color-slider-thumb-bg': '#8A9A5B',
+    '--color-slider-thumb-hover-bg': '#6B7A47',
   },
   ocean: {
     '--color-bg-primary-rgb': '11, 37, 69',
@@ -129,6 +141,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#FCE4A4',
     '--color-info': '#A4D4FC',
     '--color-icon-primary': '#A8C5E5',
+    '--color-slider-track-bg': '#1E4276',
+    '--color-slider-thumb-bg': '#3B82F6',
+    '--color-slider-thumb-hover-bg': '#2563EB',
   },
   sunset: {
     '--color-bg-primary-rgb': '45, 27, 52',
@@ -154,6 +169,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#FFE49B',
     '--color-info': '#A8C5EA',
     '--color-icon-primary': '#FFDDC1',
+    '--color-slider-track-bg': '#6D4376',
+    '--color-slider-thumb-bg': '#F97316',
+    '--color-slider-thumb-hover-bg': '#EA580C',
   },
   monochrome: {
     '--color-bg-primary-rgb': '17, 17, 17',
@@ -179,6 +197,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#FFFFFF',
     '--color-info': '#FFFFFF',
     '--color-icon-primary': '#FFFFFF',
+    '--color-slider-track-bg': '#333333',
+    '--color-slider-thumb-bg': '#FFFFFF',
+    '--color-slider-thumb-hover-bg': '#CCCCCC',
   },
   sakura: {
     '--color-bg-primary-rgb': '255, 246, 246',
@@ -204,6 +225,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#9E721A',
     '--color-info': '#59708C',
     '--color-icon-primary': '#8C6D83',
+    '--color-slider-track-bg': '#FDEFF1',
+    '--color-slider-thumb-bg': '#E58C95',
+    '--color-slider-thumb-hover-bg': '#D46A76',
   },
   vampire: {
     '--color-bg-primary-rgb': '18, 18, 18',
@@ -229,6 +253,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#FFD54F',
     '--color-info': '#90CAF9',
     '--color-icon-primary': '#E0E0E0',
+    '--color-slider-track-bg': '#2C2C2C',
+    '--color-slider-thumb-bg': '#DC143C',
+    '--color-slider-thumb-hover-bg': '#B21030',
   },
   cyberpunk: {
     '--color-bg-primary-rgb': '10, 10, 35',
@@ -254,6 +281,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#FFFF00',
     '--color-info': '#00BFFF',
     '--color-icon-primary': '#00FFFF',
+    '--color-slider-track-bg': '#24245B',
+    '--color-slider-thumb-bg': '#00FFFF',
+    '--color-slider-thumb-hover-bg': '#00CCCC',
   },
   cat: {
     '--color-bg-primary-rgb': '255, 250, 245',
@@ -279,6 +309,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#E65100',
     '--color-info': '#1565C0',
     '--color-icon-primary': '#5C4033',
+    '--color-slider-track-bg': '#F5F0EB',
+    '--color-slider-thumb-bg': '#FFB6C1',
+    '--color-slider-thumb-hover-bg': '#FF99A8',
   },
   rat: {
     '--color-bg-primary-rgb': '25, 25, 30',
@@ -304,6 +337,9 @@ export const themes: Record<string, Theme> = {
     '--color-warning': '#FFE082',
     '--color-info': '#90CAF9',
     '--color-icon-primary': '#BDBDBD',
+    '--color-slider-track-bg': '#37373C',
+    '--color-slider-thumb-bg': '#F06292',
+    '--color-slider-thumb-hover-bg': '#EC407A',
   }
 };
 
@@ -321,6 +357,9 @@ export const themeVariableManifest: Record<string, string> = {
   '--color-input-placeholder': 'Input Placeholder',
   '--color-accent': 'Accent Color',
   '--color-accent-hover': 'Accent Hover',
+  '--color-slider-track-bg': 'Slider Track',
+  '--color-slider-thumb-bg': 'Slider Thumb',
+  '--color-slider-thumb-hover-bg': 'Slider Thumb Hover',
   '--color-danger': 'Danger Text',
   '--color-danger-bg-rgb': 'Danger Background',
   '--color-success': 'Success Text',

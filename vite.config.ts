@@ -8,7 +8,8 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig(({ mode }) => {
     // Load env file based on `mode` in the current working directory.
-    const env = loadEnv(mode, process.cwd(), '');
+    // FIX: Replaced `process.cwd()` with `path.resolve()` to avoid a TypeScript error where `cwd` is not found on the `Process` type.
+    const env = loadEnv(mode, path.resolve(), '');
 
     return {
         resolve: {

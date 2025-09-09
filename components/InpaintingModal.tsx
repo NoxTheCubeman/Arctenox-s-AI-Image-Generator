@@ -249,7 +249,7 @@ const InpaintingModal: React.FC<InpaintingModalProps> = ({ isOpen, onClose, entr
                            <div className="animate-fade-in space-y-2">
                                <div>
                                    <label htmlFor="brush-size" className="block text-sm font-medium text-text-secondary mb-1">Brush Size: {brushSize}px</label>
-                                   <input id="brush-size" type="range" min="10" max="200" step="2" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb" />
+                                   <input id="brush-size" type="range" min="10" max="200" step="2" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} className="w-full h-2 bg-slider-track-bg rounded-lg appearance-none cursor-pointer range-thumb" />
                                </div>
                                <button onClick={clearMask} className="w-full px-4 py-2 text-sm font-semibold text-text-secondary bg-bg-tertiary/80 hover:bg-bg-tertiary rounded-md">Clear Mask</button>
                            </div>
@@ -265,7 +265,7 @@ const InpaintingModal: React.FC<InpaintingModalProps> = ({ isOpen, onClose, entr
                                  </div>
                                  <div>
                                     <label htmlFor="outpaint-amount" className="block text-sm font-medium text-text-secondary mb-1">Expand Amount: {outpaintAmount}px</label>
-                                    <input id="outpaint-amount" type="range" min="64" max="512" step="64" value={outpaintAmount} onChange={e => setOutpaintAmount(Number(e.target.value))} className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer range-thumb" />
+                                    <input id="outpaint-amount" type="range" min="64" max="512" step="64" value={outpaintAmount} onChange={e => setOutpaintAmount(Number(e.target.value))} className="w-full h-2 bg-slider-track-bg rounded-lg appearance-none cursor-pointer range-thumb" />
                                  </div>
                                   <button onClick={handleExpandCanvas} className="w-full px-4 py-2 font-semibold text-text-primary bg-bg-tertiary hover:bg-bg-primary rounded-md">Expand Canvas</button>
                              </div>

@@ -3,6 +3,7 @@
 
 
 
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { ImageConfig, SavedStylePreset, CustomStylePreset, SafetyCheckResult, CustomTheme, StatusMessage as StatusMessageProps, ComfyUIWorkflowPreset, GenerationHistoryEntry, TagCategories, GenerationRecipe } from '../types';
 import * as geminiService from '../services/geminiService';
@@ -44,37 +45,37 @@ const ratGifs = [
     id: 'ratiatella',
     src: 'https://media1.tenor.com/m/5xN_Eg9CCacAAAAd/ratiatella.gif',
     alt: 'ratiatella the rat',
-    position: 'bottom-right-stack-2',
+    position: 'bottom-left-stack-1',
   },
   {
     id: 'danceParty',
     src: 'https://media.tenor.com/V9XG4Lp_SN0AAAAi/rat-dance.gif',
     alt: 'rat dance party',
-    position: 'bottom-right-stack-3',
+    position: 'bottom-right-stack-2',
   },
   {
     id: 'sleepyTop',
     src: 'https://media1.tenor.com/m/nU3MsvQSc1oAAAAd/rat-sleepy.gif',
     alt: 'sleepy rat',
-    position: 'bottom-right-stack-4',
+    position: 'bottom-left-stack-2',
   },
   {
     id: 'fatRat',
     src: 'https://media1.tenor.com/m/gW0h9705OEAAAAAd/rat-fat-rat.gif',
     alt: 'fat rat',
-    position: 'bottom-left-stack-1',
+    position: 'bottom-right-stack-3',
   },
   {
     id: 'sofiaRat',
     src: 'https://media.tenor.com/FeZAdpEBTVYAAAAi/rat-sofia-rat.gif',
     alt: 'sofia rat',
-    position: 'bottom-left-stack-2',
+    position: 'bottom-left-stack-3',
   },
   {
     id: 'raspberryRat',
     src: 'https://media1.tenor.com/m/tNMfrJFRIQEAAAAC/rat.gif',
     alt: 'rat eating raspberry',
-    position: 'bottom-left-stack-3',
+    position: 'bottom-right-stack-4',
   },
   {
     id: 'kingRat',
@@ -131,11 +132,9 @@ const App: React.FC = () => {
   const [isCheckingSafety, setIsCheckingSafety] = useState<boolean>(false);
   const [safetyCheckResult, setSafetyCheckResult] = useState<SafetyCheckResult | null>(null);
   
-  // API Key Management
-  const [userApiKey, setUserApiKey] = useLocalStorage<string>('gemini-api-key', '');
+  const [userApiKey, setUserApiKey] = useLocalStorage<string>('user-gemini-api-key', '');
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
-  const productionApiKey = process.env.API_KEY;
-  const activeApiKey = productionApiKey || userApiKey;
+  const activeApiKey = userApiKey || process.env.API_KEY;
 
   // ComfyUI State
   const [comfyUiServerAddress, setComfyUiServerAddress] = useLocalStorage<string>('comfy-address', 'http://127.0.0.1:8188');
@@ -204,10 +203,13 @@ const App: React.FC = () => {
     loadHistory();
   }, []);
 
-  // Check for API key on startup
+  // Check for API key and warn if neither user key nor default key is present.
   useEffect(() => {
     if (!activeApiKey) {
-        setIsApiKeyModalOpen(true);
+      setStatusMessage({
+        text: "No API Key found. Please provide your own key by clicking 'Manage API Key' in the header, or configure the application's default key. [Read the setup guide](README.md)",
+        type: 'warning',
+      });
     }
   }, [activeApiKey]);
 
@@ -382,18 +384,13 @@ const App: React.FC = () => {
     root.style.setProperty('--ui-opacity', String(themeToApply.uiOpacity ?? 1));
   }, [theme, customThemes, setTheme, previewTheme]);
   
-  const handleApiKeyError = () => {
-      setIsApiKeyModalOpen(true);
-      setStatusMessage({
-          text: 'A Gemini API key is required. Please [get your key](https://ai.google.dev/) and set it to continue.',
-          type: 'warning',
-      });
-  };
-
   const handleApiError = (err: unknown) => {
     if ((err as Error)?.message === 'API_KEY_MISSING') {
-        handleApiKeyError();
-        return;
+        setStatusMessage({
+          text: "API Key is missing. Please provide your own key via the 'Manage API Key' button in the header.",
+          type: 'error',
+      });
+      return;
     }
 
     let errorMessage = 'An unknown error occurred. Check the browser console for details.';
@@ -405,13 +402,13 @@ const App: React.FC = () => {
     const message = ((err as any)?.message || '').toLowerCase();
     
     if (message.includes('api key not found')) {
-        errorMessage = "Configuration Error: The application's API_KEY is missing. The app cannot function without it. Please contact the administrator.";
+        errorMessage = "API Key not found. Please provide a valid key in the 'Manage API Key' settings.";
     } else if (message.includes('api key not valid') || message.includes('[400]')) {
         errorMessage = "Bad Request [400]. The server rejected the request. This can be caused by: 1) The API key is invalid or restricted. 2) Your prompt was blocked by the safety filter. Please try a different prompt.";
     } else if (message.includes('permission denied') || message.includes('api not enabled') || message.includes('[403]')) {
-        errorMessage = "Permission Denied [403]. The API key lacks permissions. Please contact the administrator to ensure the 'Generative Language API' (or 'Vertex AI API') is enabled.";
+        errorMessage = "Permission Denied [403]. The API key lacks permissions. Please check your Google Cloud project to ensure the 'Generative Language API' (or 'Vertex AI API') is enabled.";
     } else if (message.includes('quota') || message.includes('resource has been exhausted') || message.includes('[429]')) {
-        errorMessage = "API Quota Exceeded. The application has made too many requests. Please wait and try again, or contact the administrator.";
+        errorMessage = "API Quota Exceeded. You have made too many requests. Please wait and try again, or check your API key's quota limits.";
         messageType = 'warning';
     } else if (message.includes('server error') || message.includes('[500]') || message.includes('[503]')) {
          errorMessage = "Google Server Error. The AI service is temporarily unavailable. This is an issue on Google's end. Please try again in a few moments.";
@@ -430,6 +427,7 @@ const App: React.FC = () => {
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) { setStatusMessage({text: "Please enter a prompt.", type: 'error' }); return; }
+    if (!activeApiKey) { handleApiError(new Error('API_KEY_MISSING')); return; }
 
     setIsLoading(true); setStatusMessage(null); setSafetyCheckResult(null);
     try {
@@ -500,6 +498,7 @@ const App: React.FC = () => {
 
   const handleEnhancePrompt = useCallback(async () => {
     if (!prompt.trim()) return;
+    if (!activeApiKey) { handleApiError(new Error('API_KEY_MISSING')); return; }
     setIsEnhancing(true); setStatusMessage(null);
     try {
       const enhancedPrompt = await geminiService.enhancePromptWithGemini(activeApiKey, prompt);
@@ -511,6 +510,7 @@ const App: React.FC = () => {
 
   const handleSuggestNegativePrompt = useCallback(async () => {
     if (!prompt.trim()) return;
+    if (!activeApiKey) { handleApiError(new Error('API_KEY_MISSING')); return; }
     setIsSuggestingNegative(true);
     setStatusMessage({ text: 'Generating negative prompt suggestions...', type: 'info' });
     try {
@@ -538,6 +538,7 @@ const App: React.FC = () => {
 
   const handleCheckPromptSafety = useCallback(async () => {
     if (!prompt.trim()) return;
+    if (!activeApiKey) { handleApiError(new Error('API_KEY_MISSING')); return; }
     setIsCheckingSafety(true); setStatusMessage(null);
     try {
         setSafetyCheckResult(await geminiService.checkPromptSafety(activeApiKey, prompt));
@@ -547,6 +548,7 @@ const App: React.FC = () => {
   }, [prompt, activeApiKey]);
 
   const handlePostProcess = useCallback(async (id: string, imageUrl: string, processPrompt: string) => {
+    if (!activeApiKey) { handleApiError(new Error('API_KEY_MISSING')); return; }
     setProcessingIndex(id);
     setStatusMessage(null);
     try {
@@ -573,6 +575,7 @@ const App: React.FC = () => {
         setStatusMessage({ text: "An error occurred with Magic Edit.", type: 'error' });
         return;
     }
+    if (!activeApiKey) { handleApiError(new Error('API_KEY_MISSING')); return; }
     setMagicEditState(prev => ({ ...prev, isLoading: true }));
     setStatusMessage(null);
     try {
@@ -650,6 +653,7 @@ const App: React.FC = () => {
 
   const handleImageAction = (action: (apiKey: string, imageUrl: string, prompt: string) => Promise<string>, prompt: string) => 
     (id: string, imageUrl: string) => {
+        if (!activeApiKey) { handleApiError(new Error('API_KEY_MISSING')); return; }
         setProcessingIndex(id);
         setStatusMessage(null);
         action(activeApiKey, imageUrl, prompt)
@@ -754,15 +758,19 @@ const App: React.FC = () => {
             const gif = ratGifs.find(g => g.id === id);
             if (!gif) return null;
             
+            const baseGifClass = "fixed h-56 w-56 z-50 pointer-events-none border-4 border-accent rounded-lg shadow-lg object-cover";
+
             const classMap: Record<string, string> = {
-                'bottom-right-stack-1': 'fixed bottom-4 right-4 h-24 w-24 z-50 pointer-events-none rounded-full',
-                'bottom-right-stack-2': 'fixed bottom-4 right-20 h-24 w-24 z-50 pointer-events-none rounded-full',
-                'bottom-right-stack-3': 'fixed bottom-20 right-4 h-24 w-24 z-50 pointer-events-none rounded-full',
-                'bottom-right-stack-4': 'fixed bottom-20 right-20 h-24 w-24 z-50 pointer-events-none rounded-full',
-                'bottom-left-stack-1': 'fixed bottom-4 left-4 h-24 w-24 z-50 pointer-events-none rounded-full',
-                'bottom-left-stack-2': 'fixed bottom-4 left-20 h-24 w-24 z-50 pointer-events-none rounded-full',
-                'bottom-left-stack-3': 'fixed bottom-20 left-4 h-24 w-24 z-50 pointer-events-none rounded-full',
-                'bottom-left-stack-4': 'fixed bottom-20 left-20 h-24 w-24 z-50 pointer-events-none rounded-full',
+                // Right Stack
+                'bottom-right-stack-1': `${baseGifClass} bottom-4 right-4`,
+                'bottom-right-stack-2': `${baseGifClass} bottom-[17rem] right-4`,
+                'bottom-right-stack-3': `${baseGifClass} bottom-[33rem] right-4`,
+                'bottom-right-stack-4': `${baseGifClass} bottom-[49rem] right-4`,
+                // Left Stack
+                'bottom-left-stack-1': `${baseGifClass} bottom-4 left-4`,
+                'bottom-left-stack-2': `${baseGifClass} bottom-[17rem] left-4`,
+                'bottom-left-stack-3': `${baseGifClass} bottom-[33rem] left-4`,
+                'bottom-left-stack-4': `${baseGifClass} bottom-[49rem] left-4`,
             };
             
             const finalClassName = gif.className || classMap[gif.position] || '';
@@ -776,7 +784,6 @@ const App: React.FC = () => {
         onOpenThemeEditor={() => setIsThemeEditorOpen(true)}
         onHeaderClick={handleHeaderClick}
         onOpenHistory={() => setIsHistoryOpen(true)}
-        hasProductionKey={!!productionApiKey}
         onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
       />
       <main ref={mainRef} className="container mx-auto p-4 md:p-8 flex-grow space-y-8">
@@ -852,15 +859,12 @@ const App: React.FC = () => {
       <Footer />
 
       {/* --- Modals --- */}
-       <ApiKeyModal
-            isOpen={isApiKeyModalOpen}
-            onClose={() => setIsApiKeyModalOpen(false)}
-            apiKey={userApiKey}
-            onSaveApiKey={(key) => {
-                setUserApiKey(key);
-                setStatusMessage({ text: "API Key saved successfully.", type: 'success' });
-            }}
-        />
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        apiKey={userApiKey}
+        onSaveApiKey={setUserApiKey}
+      />
       <StyleManager
         isOpen={isStyleManagerOpen}
         onClose={() => setIsStyleManagerOpen(false)}
