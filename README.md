@@ -6,6 +6,7 @@
 
 - Node.js
 - A Google Gemini API Key
+- ComfyUI
 
 ## How It Works
 
