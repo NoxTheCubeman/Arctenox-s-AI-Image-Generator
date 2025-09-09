@@ -10,9 +10,11 @@ export const UPSCALE_PROMPT = "Analyze this image and significantly upscale its 
 export const REMOVE_WATERMARK_PROMPT = "Analyze this image and intelligently remove any watermarks, text, logos, or other overlayed graphics. Perfectly reconstruct the background behind the removed elements, matching textures, lighting, and colors seamlessly.";
 
 // --- HELPER: Get AI Client ---
-const getAiClient = (apiKey: string) => {
+const getAiClient = () => {
+    // The API_KEY is expected to be set in the environment by the build tool (e.g., Vite).
+    const apiKey = process.env.API_KEY;
     if (!apiKey) {
-        throw new Error("Gemini API Key is not provided.");
+        throw new Error("API Key not found. The application is missing its API_KEY environment variable.");
     }
     return new GoogleGenAI({ apiKey });
 };
@@ -36,10 +38,9 @@ export const generateImagesFromPrompt = async (
     prompt: string, 
     config: ImageConfig, 
     uploadedImage: { data: string; mimeType: string } | null,
-    customStyles: CustomStylePreset[],
-    apiKey: string
+    customStyles: CustomStylePreset[]
 ): Promise<string[]> => {
-    const ai = getAiClient(apiKey);
+    const ai = getAiClient();
     const fullPrompt = getFullPrompt(prompt, config, customStyles);
 
     if (uploadedImage) {
@@ -92,10 +93,9 @@ export const generateImagesFromPrompt = async (
 
 export const postProcessImage = async (
     imageDataUrl: string, 
-    processPrompt: string,
-    apiKey: string
+    processPrompt: string
 ): Promise<string> => {
-    const ai = getAiClient(apiKey);
+    const ai = getAiClient();
     const imagePart = dataUrlToInlineData(imageDataUrl);
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image-preview',
@@ -107,8 +107,8 @@ export const postProcessImage = async (
     return `data:${resultPart.inlineData.mimeType};base64,${resultPart.inlineData.data}`;
 };
 
-export const enhancePromptWithGemini = async (prompt: string, apiKey: string): Promise<string> => {
-    const ai = getAiClient(apiKey);
+export const enhancePromptWithGemini = async (prompt: string): Promise<string> => {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `Enhance the following prompt to be more descriptive and imaginative for an AI image generator. Focus on visual details. Prompt: "${prompt}"`,
@@ -120,8 +120,8 @@ export const enhancePromptWithGemini = async (prompt: string, apiKey: string): P
     return response.text.trim();
 };
 
-export const checkPromptSafety = async (prompt: string, apiKey: string): Promise<SafetyCheckResult> => {
-    const ai = getAiClient(apiKey);
+export const checkPromptSafety = async (prompt: string): Promise<SafetyCheckResult> => {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `Analyze the following prompt for an AI image generator. First, determine if the prompt is safe or not. If it's safe, your entire response must start with "SAFE:". If it's problematic, it must start with "WARNING:". After the label, provide a brief, one-sentence explanation. If it's a WARNING, also provide a safer alternative prompt on a new line, prefixed with "SUGGESTION:". Prompt: "${prompt}"`,
@@ -140,8 +140,8 @@ export const checkPromptSafety = async (prompt: string, apiKey: string): Promise
     return { isSafe: false, feedback, suggestion };
 };
 
-export const suggestNegativePrompt = async (prompt: string, apiKey: string): Promise<string> => {
-    const ai = getAiClient(apiKey);
+export const suggestNegativePrompt = async (prompt: string): Promise<string> => {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `Based on the following positive prompt for an image generator, suggest a comma-separated list of negative keywords to prevent common visual artifacts, bad anatomy, and improve overall quality. Positive prompt: "${prompt}"`,

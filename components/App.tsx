@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { ImageConfig, SavedStylePreset, CustomStylePreset, SafetyCheckResult, CustomTheme, StatusMessage as StatusMessageProps, ComfyUIWorkflowPreset, GenerationHistoryEntry, TagCategories, GenerationRecipe } from '../types';
 import * as geminiService from '../services/geminiService';
@@ -25,7 +27,6 @@ import CheckpointManagerModal from './CheckpointManagerModal';
 import WorkflowPreviewModal from './WorkflowPreviewModal';
 import RecipeManagerModal from './RecipeManagerModal';
 import { getComfyPrompt } from '../lib/promptBuilder';
-import ApiKeyModal from './ApiKeyModal';
 
 const MAX_HISTORY_SIZE = 50; // Cap history to prevent storage quota errors
 
@@ -126,8 +127,6 @@ const App: React.FC = () => {
   const [processingIndex, setProcessingIndex] = useState<string | null>(null);
   const [isCheckingSafety, setIsCheckingSafety] = useState<boolean>(false);
   const [safetyCheckResult, setSafetyCheckResult] = useState<SafetyCheckResult | null>(null);
-  const [userApiKey, setUserApiKey] = useLocalStorage<string>('gemini-api-key', '');
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   
   // ComfyUI State
   const [comfyUiServerAddress, setComfyUiServerAddress] = useLocalStorage<string>('comfy-address', 'http://127.0.0.1:8188');
@@ -376,13 +375,14 @@ const App: React.FC = () => {
 
     const message = ((err as any)?.message || '').toLowerCase();
     
-    // Check for specific error messages from the Gemini SDK or fetch API
-    if (message.includes('api key not valid') || message.includes('[400]')) {
-        errorMessage = "API Key Not Valid. Please double-check that the key is correct and has no extra spaces. A valid key usually starts with 'AIzaSy'.";
+    if (message.includes('api key not found')) {
+        errorMessage = "Configuration Error: The application's API_KEY is missing. The app cannot function without it. Please contact the administrator.";
+    } else if (message.includes('api key not valid') || message.includes('[400]')) {
+        errorMessage = "Bad Request [400]. The server rejected the request. This can be caused by: 1) The application's API key is invalid or restricted. 2) Your prompt was blocked by the safety filter. Please try a different prompt.";
     } else if (message.includes('permission denied') || message.includes('api not enabled') || message.includes('[403]')) {
-        errorMessage = "Permission Denied. Your API key is valid, but it lacks permission. Please ensure the 'Generative Language API' (or 'Vertex AI API') is enabled in your Google Cloud project.";
+        errorMessage = "Permission Denied [403]. The application's API key lacks permissions. Please contact the administrator to ensure the 'Generative Language API' (or 'Vertex AI API') is enabled.";
     } else if (message.includes('quota') || message.includes('resource has been exhausted') || message.includes('[429]')) {
-        errorMessage = "API Quota Exceeded. You've made too many requests with this key. Please wait and try again, or check your Google Cloud project for quota details.";
+        errorMessage = "API Quota Exceeded. The application has made too many requests. Please wait and try again, or contact the administrator.";
         messageType = 'warning';
     } else if (message.includes('server error') || message.includes('[500]') || message.includes('[503]')) {
          errorMessage = "Google Server Error. The AI service is temporarily unavailable. This is an issue on Google's end. Please try again in a few moments.";
@@ -400,16 +400,11 @@ const App: React.FC = () => {
   };
 
   const handleGenerate = useCallback(async () => {
-    if (!userApiKey) {
-        setStatusMessage({ text: "Please enter your Gemini API key first.", type: 'warning' });
-        setIsApiKeyModalOpen(true);
-        return;
-    }
     if (!prompt.trim()) { setStatusMessage({text: "Please enter a prompt.", type: 'error' }); return; }
 
     setIsLoading(true); setStatusMessage(null); setSafetyCheckResult(null);
     try {
-      const generatedDataUrls = await geminiService.generateImagesFromPrompt(prompt, config, uploadedImage, customStyles, userApiKey);
+      const generatedDataUrls = await geminiService.generateImagesFromPrompt(prompt, config, uploadedImage, customStyles);
       const newEntries: GenerationHistoryEntry[] = generatedDataUrls.map(url => ({ 
           id: crypto.randomUUID(), 
           imageDataUrl: url, 
@@ -423,7 +418,7 @@ const App: React.FC = () => {
     } catch (err) {
       handleApiError(err);
     } finally { setIsLoading(false); }
-  }, [prompt, config, uploadedImage, customStyles, userApiKey]);
+  }, [prompt, config, uploadedImage, customStyles]);
 
   const handlePrimarySubmit = useCallback(() => {
     if (config.model === 'comfyui-local') {
@@ -486,24 +481,22 @@ const App: React.FC = () => {
   };
 
   const handleEnhancePrompt = useCallback(async () => {
-    if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
     if (!prompt.trim()) return;
     setIsEnhancing(true); setStatusMessage(null);
     try {
-      const enhancedPrompt = await geminiService.enhancePromptWithGemini(prompt, userApiKey);
+      const enhancedPrompt = await geminiService.enhancePromptWithGemini(prompt);
       setPrompt(enhancedPrompt);
     } catch (err) { 
       handleApiError(err);
     } finally { setIsEnhancing(false); }
-  }, [prompt, userApiKey]);
+  }, [prompt]);
 
   const handleSuggestNegativePrompt = useCallback(async () => {
-    if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
     if (!prompt.trim()) return;
     setIsSuggestingNegative(true);
     setStatusMessage({ text: 'Generating negative prompt suggestions...', type: 'info' });
     try {
-      const suggestion = await geminiService.suggestNegativePrompt(prompt, userApiKey);
+      const suggestion = await geminiService.suggestNegativePrompt(prompt);
       setConfig(prevConfig => {
         // Create a set of existing tags for easy de-duplication
         const existingTags = new Set(prevConfig.negativePrompt.split(',').map(t => t.trim()).filter(Boolean));
@@ -523,25 +516,23 @@ const App: React.FC = () => {
     } finally {
       setIsSuggestingNegative(false);
     }
-  }, [prompt, setConfig, userApiKey]);
+  }, [prompt, setConfig]);
 
   const handleCheckPromptSafety = useCallback(async () => {
-    if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
     if (!prompt.trim()) return;
     setIsCheckingSafety(true); setStatusMessage(null);
     try {
-        setSafetyCheckResult(await geminiService.checkPromptSafety(prompt, userApiKey));
+        setSafetyCheckResult(await geminiService.checkPromptSafety(prompt));
     } catch (err) { 
         handleApiError(err);
     } finally { setIsCheckingSafety(false); }
-  }, [prompt, userApiKey]);
+  }, [prompt]);
 
   const handlePostProcess = useCallback(async (id: string, imageUrl: string, processPrompt: string) => {
-    if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
     setProcessingIndex(id);
     setStatusMessage(null);
     try {
-        const newImage = await geminiService.postProcessImage(imageUrl, processPrompt, userApiKey);
+        const newImage = await geminiService.postProcessImage(imageUrl, processPrompt);
         const newEntry: GenerationHistoryEntry = {
             id: crypto.randomUUID(),
             imageDataUrl: newImage,
@@ -557,17 +548,17 @@ const App: React.FC = () => {
     } finally {
         setProcessingIndex(null);
     }
-}, [config, userApiKey]);
+}, [config]);
 
   const handleMagicEdit = useCallback(async (editPrompt: string) => {
-    if (!userApiKey || !magicEditState.imageData || !magicEditState.imageId) {
+    if (!magicEditState.imageData || !magicEditState.imageId) {
         setStatusMessage({ text: "An error occurred with Magic Edit.", type: 'error' });
         return;
     }
     setMagicEditState(prev => ({ ...prev, isLoading: true }));
     setStatusMessage(null);
     try {
-        const newImage = await geminiService.postProcessImage(magicEditState.imageData, editPrompt, userApiKey);
+        const newImage = await geminiService.postProcessImage(magicEditState.imageData, editPrompt);
         const newEntry: GenerationHistoryEntry = {
             id: crypto.randomUUID(),
             imageDataUrl: newImage,
@@ -584,7 +575,7 @@ const App: React.FC = () => {
     } finally {
         setMagicEditState(prev => ({ ...prev, isLoading: false }));
     }
-  }, [config, magicEditState.imageData, magicEditState.imageId, userApiKey]);
+  }, [config, magicEditState.imageData, magicEditState.imageId]);
 
   const handleSyncComfyImages = async (options?: { closeModal?: boolean }) => {
     try {
@@ -639,12 +630,11 @@ const App: React.FC = () => {
       }
   };
 
-  const handleImageAction = (action: (imageUrl: string, prompt: string, apiKey: string) => Promise<string>, prompt: string) => 
+  const handleImageAction = (action: (imageUrl: string, prompt: string) => Promise<string>, prompt: string) => 
     (id: string, imageUrl: string) => {
-        if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
         setProcessingIndex(id);
         setStatusMessage(null);
-        action(imageUrl, prompt, userApiKey)
+        action(imageUrl, prompt)
             .then(newImage => {
                 const newEntry: GenerationHistoryEntry = {
                     id: crypto.randomUUID(),
@@ -768,7 +758,6 @@ const App: React.FC = () => {
         onOpenThemeEditor={() => setIsThemeEditorOpen(true)}
         onHeaderClick={handleHeaderClick}
         onOpenHistory={() => setIsHistoryOpen(true)}
-        onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
       />
       <main ref={mainRef} className="container mx-auto p-4 md:p-8 flex-grow space-y-8">
         <div className="max-w-4xl mx-auto space-y-4">
@@ -789,6 +778,7 @@ const App: React.FC = () => {
             isEnhancing={isEnhancing}
             onSuggestNegativePrompt={handleSuggestNegativePrompt}
             isSuggestingNegative={isSuggestingNegative}
+            // FIX: Corrected typo from handleCheckSafety to handleCheckPromptSafety
             onCheckSafety={handleCheckPromptSafety}
             isCheckingSafety={isCheckingSafety}
             safetyCheckResult={safetyCheckResult}
@@ -843,12 +833,6 @@ const App: React.FC = () => {
       <Footer />
 
       {/* --- Modals --- */}
-      <ApiKeyModal 
-        isOpen={isApiKeyModalOpen}
-        onClose={() => setIsApiKeyModalOpen(false)}
-        apiKey={userApiKey}
-        onSaveApiKey={(key) => setUserApiKey(key)}
-      />
       <StyleManager
         isOpen={isStyleManagerOpen}
         onClose={() => setIsStyleManagerOpen(false)}

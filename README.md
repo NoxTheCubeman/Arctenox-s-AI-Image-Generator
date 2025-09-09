@@ -5,11 +5,10 @@
 ## Prerequisites
 
 - Node.js
-- A Google Gemini API Key
 
 ## How It Works
 
-This application runs entirely in your browser. To use it, you must provide your own Google Gemini API key. The key is stored securely in your browser's local storage and is never sent to any server other than the official Google AI API endpoints.
+This application runs entirely in your browser and connects to the Google Gemini API. It requires a pre-configured API key to be available as an environment variable (`API_KEY`) during the build process. The application is designed to be deployed to a static hosting service where this key is securely provided.
 
 ## Running Locally
 
@@ -17,8 +16,9 @@ This application runs entirely in your browser. To use it, you must provide your
     `npm install`
 2.  **Run the development server:**
     `npm run dev`
-3.  **Provide your API Key:** Open the application in your browser, click the "Manage API Key" button in the header, and enter your Gemini API key.
+    
+    *Note: An `API_KEY` environment variable containing a valid Google Gemini API key must be available to the Vite development server for the application to function.*
 
 ## Deploying
 
-You can deploy this project to any static hosting service like Vercel, Netlify, or GitHub Pages. No server-side configuration is needed. After deploying, users will be required to enter their own API key to use the service, just like in the local setup.
+You can deploy this project to any static hosting service like Vercel, Netlify, or GitHub Pages. No server-side configuration is needed beyond providing the `API_KEY` environment variable to the build process.
