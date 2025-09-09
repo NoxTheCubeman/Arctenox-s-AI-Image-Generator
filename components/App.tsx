@@ -368,26 +368,32 @@ const App: React.FC = () => {
   }, [theme, customThemes, setTheme, previewTheme]);
 
   const handleApiError = (err: unknown) => {
-    let errorMessage = 'An unknown error occurred.';
+    let errorMessage = 'An unknown error occurred. Check the browser console for details.';
     let messageType: StatusMessageProps['type'] = 'error';
 
-    if (err instanceof Error) {
-        const message = err.message.toLowerCase();
+    // Log the full error to the console for power users to debug
+    console.error("An error occurred during API call:", err);
 
-        if (message.includes('400') && (message.includes('api key not valid') || message.includes('invalid'))) {
-            errorMessage = "API Key Not Valid. Please double-check that the key you entered is correct, complete, and has no extra spaces or characters. A valid key starts with 'AIzaSy'.";
-        } else if (message.includes('403') && message.includes('permission denied')) {
-            errorMessage = "Permission Denied. Your API key is valid, but it doesn't have permission to use the Gemini API. Please ensure the 'Generative Language API' is enabled in your Google Cloud project.";
-        } else if (message.includes('429') && (message.includes('resource_exhausted') || message.includes('quota'))) {
-            errorMessage = "API Rate Limit Exceeded. You've made too many requests with this key. Please wait a minute and try again, or check your Google Cloud project for quota details.";
-            messageType = 'warning';
-        } else if (message.includes('500') || message.includes('503')) {
-             errorMessage = "Google Server Error. The AI service is temporarily unavailable. Please try again in a few moments.";
-             messageType = 'warning';
-        } else {
-             // Default to the original error message for unexpected errors
-             errorMessage = err.message;
-        }
+    const message = ((err as any)?.message || '').toLowerCase();
+    
+    // Check for specific error messages from the Gemini SDK or fetch API
+    if (message.includes('api key not valid') || message.includes('[400]')) {
+        errorMessage = "API Key Not Valid. Please double-check that the key is correct and has no extra spaces. A valid key usually starts with 'AIzaSy'.";
+    } else if (message.includes('permission denied') || message.includes('api not enabled') || message.includes('[403]')) {
+        errorMessage = "Permission Denied. Your API key is valid, but it lacks permission. Please ensure the 'Generative Language API' (or 'Vertex AI API') is enabled in your Google Cloud project.";
+    } else if (message.includes('quota') || message.includes('resource has been exhausted') || message.includes('[429]')) {
+        errorMessage = "API Quota Exceeded. You've made too many requests with this key. Please wait and try again, or check your Google Cloud project for quota details.";
+        messageType = 'warning';
+    } else if (message.includes('server error') || message.includes('[500]') || message.includes('[503]')) {
+         errorMessage = "Google Server Error. The AI service is temporarily unavailable. This is an issue on Google's end. Please try again in a few moments.";
+         messageType = 'warning';
+    } else if (message.includes('did not return any images') || message.includes('prompt may have been blocked')) {
+        // This catches my custom errors from geminiService
+        errorMessage = "Generation failed. The prompt was likely blocked by Google's safety filter. Please modify your prompt and try again.";
+        messageType = 'warning';
+    } else if (message) {
+         // Fallback to the error message if it's not one of the known types
+         errorMessage = (err as Error).message;
     }
     
     setStatusMessage({ text: errorMessage, type: messageType });

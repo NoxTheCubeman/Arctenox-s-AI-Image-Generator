@@ -66,6 +66,9 @@ export const generateImagesFromPrompt = async (
                 aspectRatio: config.aspectRatio,
             },
         });
+        if (!response.generatedImages || response.generatedImages.length === 0) {
+            throw new Error("Imagen did not return any images. The prompt may have been blocked due to safety policies, or there might be an issue with your API key or quota.");
+        }
         return response.generatedImages.map(img => `data:image/jpeg;base64,${img.image.imageBytes}`);
     } else { // gemini-2.5-flash-image-preview
         const promises = Array(config.numberOfImages).fill(null).map(() => 
