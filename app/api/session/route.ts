@@ -1,30 +1,18 @@
-// /app/api/generate/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { google } from '@ai-sdk/google';
-import { experimental_generateText as generateText } from 'ai';
-import { assertAndConsume } from '@/lib/session';
+// /app/api/session/route.ts
+import { NextResponse } from 'next/server';
+import { mintSession } from '@/lib/session';
 
-export const runtime = 'edge';
+export async function POST() {
+  const token = await mintSession();
 
-export async function POST(req: NextRequest) {
-  try {
-    const token =
-      req.headers.get('x-session-key') ??
-      req.cookies.get('sessionKey')?.value;
-
-    await assertAndConsume(token);
-
-    const { prompt } = await req.json();
-
-    // Gemini provider
-    const { text } = await generateText({
-      model: google('gemini-1.5-pro'), // choose gemini-1.5-flash/pro etc.
-      prompt,
-    });
-
-    return NextResponse.json({ output: text });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message ?? 'Error' }, { status: 400 });
-  }
+  // Also set a secure cookie so the client doesn’t need to store it manually
+  const res = NextResponse.json({ sessionKey: token });
+  res.cookies.set('sessionKey', token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: true,
+    path: '/',
+    maxAge: parseInt(process.env.SESSION_TTL_SECONDS ?? '3600', 10),
+  });
+  return res;
 }
-
