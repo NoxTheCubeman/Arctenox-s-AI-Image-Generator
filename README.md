@@ -8,17 +8,27 @@
 
 ## How It Works
 
-This application runs entirely in your browser and connects to the Google Gemini API. It requires a pre-configured API key to be available as an environment variable (`API_KEY`) during the build process. The application is designed to be deployed to a static hosting service where this key is securely provided.
+This application runs entirely in your browser and connects to the Google Gemini API. It uses an API key provided via an environment variable.
+
+- **For local development**, the key is loaded from a `.env.local` file (see "Running Locally").
+- **For deployment**, the key (`VITE_API_KEY`) should be set as a secure environment variable in your hosting provider's build settings.
 
 ## Running Locally
 
 1.  **Install dependencies:**
     `npm install`
-2.  **Run the development server:**
+
+2.  **Set up your API Key:**
+    - Create a new file in the root of the project named `.env.local`.
+    - Add the following line to this file, replacing `YOUR_GEMINI_API_KEY_HERE` with your actual Google Gemini API key:
+      ```
+      VITE_API_KEY="YOUR_GEMINI_API_KEY_HERE"
+      ```
+    - The `.env.local` file is ignored by git, so your key will remain private.
+
+3.  **Run the development server:**
     `npm run dev`
-    
-    *Note: An `API_KEY` environment variable containing a valid Google Gemini API key must be available to the Vite development server for the application to function.*
 
 ## Deploying
 
-You can deploy this project to any static hosting service like Vercel by pasting this in your url: `arctenox-s-image-generator.vercel.app`. No server-side configuration is needed beyond providing the `API_KEY` environment variable to the build process.
+You can deploy this project to any static hosting service like Vercel, Netlify, or GitHub Pages. No server-side configuration is needed beyond providing the `VITE_API_KEY` environment variable to the build process.
