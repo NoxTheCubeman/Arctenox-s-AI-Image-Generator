@@ -367,6 +367,22 @@ const App: React.FC = () => {
     root.style.setProperty('--ui-opacity', String(themeToApply.uiOpacity ?? 1));
   }, [theme, customThemes, setTheme, previewTheme]);
 
+  const handleApiError = (err: unknown) => {
+    let errorMessage = 'An unknown error occurred.';
+    let messageType: StatusMessageProps['type'] = 'error';
+
+    if (err instanceof Error) {
+        errorMessage = err.message;
+        // Check for the specific 429 rate limit error from Google API
+        if (errorMessage.includes('429') && (errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('exceeded your current quota'))) {
+            errorMessage = "API Rate Limit Exceeded. You've made too many requests with your key recently. Please wait a minute and try again, or check your Google AI Studio dashboard for quota details.";
+            messageType = 'warning';
+        }
+    }
+    
+    setStatusMessage({ text: errorMessage, type: messageType });
+  };
+
   const handleGenerate = useCallback(async () => {
     if (!userApiKey) {
         setStatusMessage({ text: "Please enter your Gemini API key first.", type: 'warning' });
@@ -389,7 +405,7 @@ const App: React.FC = () => {
       await dbService.addMultipleHistoryEntries(newEntries);
       setHistory(prev => [...newEntries, ...prev].slice(0, MAX_HISTORY_SIZE));
     } catch (err) {
-      setStatusMessage({ text: err instanceof Error ? err.message : 'An unknown error occurred.', type: 'error' });
+      handleApiError(err);
     } finally { setIsLoading(false); }
   }, [prompt, config, uploadedImage, customStyles, userApiKey]);
 
@@ -460,7 +476,8 @@ const App: React.FC = () => {
     try {
       const enhancedPrompt = await geminiService.enhancePromptWithGemini(prompt, userApiKey);
       setPrompt(enhancedPrompt);
-    } catch (err) { setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
+    } catch (err) { 
+      handleApiError(err);
     } finally { setIsEnhancing(false); }
   }, [prompt, userApiKey]);
 
@@ -486,7 +503,7 @@ const App: React.FC = () => {
       });
       setStatusMessage({ text: 'Negative prompt updated with suggestions.', type: 'success' });
     } catch (err) {
-      setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
+      handleApiError(err);
     } finally {
       setIsSuggestingNegative(false);
     }
@@ -498,7 +515,8 @@ const App: React.FC = () => {
     setIsCheckingSafety(true); setStatusMessage(null);
     try {
         setSafetyCheckResult(await geminiService.checkPromptSafety(prompt, userApiKey));
-    } catch (err) { setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
+    } catch (err) { 
+        handleApiError(err);
     } finally { setIsCheckingSafety(false); }
   }, [prompt, userApiKey]);
 
@@ -531,7 +549,7 @@ const App: React.FC = () => {
             return updatedHistory;
         });
     } catch (err) { 
-        setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
+        handleApiError(err);
     } finally { 
         setProcessingIndex(null); 
     }
@@ -572,7 +590,7 @@ const App: React.FC = () => {
 
       setMagicEditState({ isOpen: false, imageData: null, imageId: null, isLoading: false });
     } catch (err) {
-      setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
+      handleApiError(err);
       setMagicEditState(prev => ({ ...prev, isLoading: false }));
     }
   }, [history, magicEditState.imageId, magicEditState.imageData, userApiKey]);

@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { ImageConfig, AspectRatio, ArtisticStyle, ImageModel, SavedStylePreset, CustomStylePreset, SafetyCheckResult, ComfyUIWorkflowPreset, TagCategories, SeedControl, LoRA } from '../types';
 import { randomPrompts } from '../lib/prompts';
@@ -172,7 +173,7 @@ type Capability = NoBatchCapability | BatchCapability;
 
 const modelCapabilities: Record<ImageModel, Capability> = {
     'imagen-4.0-generate-001': { maxImages: 8, aspectRatio: true, img2img: true, batch: false },
-    'gemini-2.5-flash-image-preview': { maxImages: 8, aspectRatio: true, img2img: true, batch: false }, // Updated maxImages
+    'gemini-2.5-flash-image-preview': { maxImages: 8, aspectRatio: true, img2img: true, batch: false },
     'comfyui-local': { maxImages: 1, aspectRatio: false, img2img: true, batch: true, maxBatch: 10 },
 };
 

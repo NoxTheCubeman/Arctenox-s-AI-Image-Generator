@@ -6,7 +6,6 @@
 
 - Node.js
 - A Google Gemini API Key
-- ComfyUI
 
 ## How It Works
 
@@ -22,4 +21,4 @@ This application runs entirely in your browser. To use it, you must provide your
 
 ## Deploying
 
-You can deploy this project to any static hosting service like Vercel `(https://https://arctenox-s-image-generator.vercel.app)`. This will eventually be put onto other sites to be deployed there. No server-side configuration is needed. After deploying, users will be required to enter their own API key in the top right `Manage API Key` or to enter it when they click generate, to be able to use the app, just like in the local setup for safety issues and so everyone has a different session entirely.
+You can deploy this project to any static hosting service like Vercel, Netlify, or GitHub Pages. No server-side configuration is needed. After deploying, users will be required to enter their own API key to use the service, just like in the local setup.
