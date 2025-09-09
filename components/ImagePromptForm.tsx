@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { ImageConfig, AspectRatio, ArtisticStyle, ImageModel, SavedStylePreset, CustomStylePreset, SafetyCheckResult, ComfyUIWorkflowPreset, TagCategories, SeedControl, LoRA } from '../types';
 import { randomPrompts } from '../lib/prompts';
@@ -410,9 +411,23 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
           return newConfig;
       });
   };
+  
+  const isComfyReady = comfyUiStatus === 'online' && !!selectedComfyUiCheckpoint;
+  const isSubmitDisabled = isLoading || (isComfyUi && !isComfyReady);
+  
+  const handleSubmitOrQueue = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isComfyUi) {
+        if (isComfyReady) {
+            onQueueComfyInBackground();
+        }
+    } else {
+        onSubmit();
+    }
+  };
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="space-y-6 animate-slide-up">
+    <form onSubmit={handleSubmitOrQueue} className="space-y-6 animate-slide-up">
         {/* Core Prompt Section */}
         <FormSection title="Core Prompt" actions={
             <button type="button" onClick={onOpenRecipeManager} className="text-sm font-medium text-accent hover:text-text-primary transition-colors">Manage Recipes</button>
@@ -939,7 +954,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                                             type="number"
                                             value={config.comfyUiSeed}
                                             onChange={(e) => setConfig(prev => ({ ...prev, comfyUiSeed: Number(e.target.value) }))}
-                                            className="flex-grow p-2 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             disabled={isLoading}
                                         />
                                         <button
@@ -974,7 +989,6 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                     {comfyUiStatus === 'online' && (
                         <ResizableComfyUIEmbed 
                             serverAddress={comfyUiServerAddress} 
-                            // FIX: The prop name expected by ResizableComfyUIEmbed is `onSyncImages`, but the prop available in this component is `onSyncComfyImages`.
                             onSyncImages={onSyncComfyImages}
                             onQueue={onQueueComfyInBackground}
                         />
@@ -1012,7 +1026,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
       <div className="flex justify-center mt-4">
         <button
           type="submit"
-          disabled={isLoading || isComfyUi}
+          disabled={isSubmitDisabled}
           className="w-full md:w-1/2 flex justify-center items-center p-4 text-lg font-bold text-white bg-accent rounded-lg shadow-lg hover:bg-accent-hover disabled:bg-bg-tertiary disabled:cursor-not-allowed transition-all transform hover:scale-105"
         >
           {isLoading ? (
@@ -1021,7 +1035,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
               Generating...
             </>
           ) : isComfyUi ? (
-              'Queueing Disabled - Use ComfyUI Interface'
+              'Queue Prompt'
           ) : (
             'Generate'
           )}

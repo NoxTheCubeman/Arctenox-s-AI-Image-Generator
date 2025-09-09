@@ -9,9 +9,11 @@ interface HeaderProps {
   customThemes: CustomTheme[];
   onHeaderClick: () => void;
   onOpenHistory: () => void;
+  hasProductionKey: boolean;
+  onOpenApiKeyModal: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ theme, setTheme, onOpenThemeEditor, customThemes, onHeaderClick, onOpenHistory }) => {
+const Header: React.FC<HeaderProps> = ({ theme, setTheme, onOpenThemeEditor, customThemes, onHeaderClick, onOpenHistory, hasProductionKey, onOpenApiKeyModal }) => {
   return (
     <header className="bg-bg-secondary/50 backdrop-blur-sm p-4 sticky top-0 z-10 shadow-lg animate-fade-in">
       <div className="container mx-auto grid grid-cols-3 items-center">
@@ -41,6 +43,14 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onOpenThemeEditor, cus
 
         {/* Right-aligned content */}
         <div className="flex justify-end items-center gap-4">
+             {!hasProductionKey && (
+                <button
+                    onClick={onOpenApiKeyModal}
+                    className="text-sm font-medium text-accent hover:text-text-primary transition-colors"
+                >
+                    Set API Key
+                </button>
+            )}
             <button
                 onClick={onOpenThemeEditor}
                 className="text-sm font-medium text-accent hover:text-text-primary transition-colors"
