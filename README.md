@@ -1,23 +1,24 @@
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
-This is a front-end, app. This is not a back-end that does all the work.
 
-## How to deploy.
+## Prerequisites
 
-Note: There will be more options in the future when I can deploy it on other places with no issues.
+- Node.js
+- A Google Gemini API Key
 
-## Option 1) Run Locally
+## How It Works
 
-- **Prerequisites:**  Node.js
+This application runs entirely in your browser. To use it, you must provide your own Google Gemini API key. The key is stored securely in your browser's local storage and is never sent to any server other than the official Google AI API endpoints.
 
-1. Install dependencies:
-   
-   `npm i ai @ai-sdk/google @vercel/kv uuid`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
-   
-## Option 2) Run with Vercel
-   
-Put `arctenox-s-image-generator.vercel.app` into your URL.
+## Running Locally
+
+1.  **Install dependencies:**
+    `npm install`
+2.  **Run the development server:**
+    `npm run dev`
+3.  **Provide your API Key:** Open the application in your browser, click the "Manage API Key" button in the header, and enter your Gemini API key.
+
+## Deploying
+
+You can deploy this project to any static hosting service like Vercel, Netlify, or GitHub Pages. No server-side configuration is needed. After deploying, users will be required to enter their own API key to use the service, just like in the local setup.

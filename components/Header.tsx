@@ -9,9 +9,10 @@ interface HeaderProps {
   customThemes: CustomTheme[];
   onHeaderClick: () => void;
   onOpenHistory: () => void;
+  onOpenApiKeyModal: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ theme, setTheme, onOpenThemeEditor, customThemes, onHeaderClick, onOpenHistory }) => {
+const Header: React.FC<HeaderProps> = ({ theme, setTheme, onOpenThemeEditor, customThemes, onHeaderClick, onOpenHistory, onOpenApiKeyModal }) => {
   return (
     <header className="bg-bg-secondary/50 backdrop-blur-sm p-4 sticky top-0 z-10 shadow-lg animate-fade-in">
       <div className="container mx-auto grid grid-cols-3 items-center">
@@ -41,6 +42,13 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onOpenThemeEditor, cus
 
         {/* Right-aligned content */}
         <div className="flex justify-end items-center gap-4">
+             <button
+                onClick={onOpenApiKeyModal}
+                className="text-sm font-medium text-accent hover:text-text-primary transition-colors flex items-center gap-1"
+            >
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 1 1 0 000-2z" clipRule="evenodd" /></svg>
+                Manage API Key
+            </button>
             <button
                 onClick={onOpenThemeEditor}
                 className="text-sm font-medium text-accent hover:text-text-primary transition-colors"

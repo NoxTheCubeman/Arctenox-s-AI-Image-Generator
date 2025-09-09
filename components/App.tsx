@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { ImageConfig, SavedStylePreset, CustomStylePreset, SafetyCheckResult, CustomTheme, StatusMessage as StatusMessageProps, ComfyUIWorkflowPreset, GenerationHistoryEntry, TagCategories, GenerationRecipe } from '../types';
-import { generateImagesFromPrompt, postProcessImage, ENHANCE_PROMPT, FACE_FIX_PROMPT, UPSCALE_PROMPT, REMOVE_WATERMARK_PROMPT, enhancePromptWithGemini, checkPromptSafety, suggestNegativePrompt } from '../services/geminiService';
+import * as geminiService from '../services/geminiService';
 import * as comfyuiService from '../services/comfyuiService';
 import * as dbService from '../services/dbService';
 import Header from './Header';
@@ -25,6 +25,7 @@ import CheckpointManagerModal from './CheckpointManagerModal';
 import WorkflowPreviewModal from './WorkflowPreviewModal';
 import RecipeManagerModal from './RecipeManagerModal';
 import { getComfyPrompt } from '../lib/promptBuilder';
+import ApiKeyModal from './ApiKeyModal';
 
 const MAX_HISTORY_SIZE = 50; // Cap history to prevent storage quota errors
 
@@ -125,6 +126,8 @@ const App: React.FC = () => {
   const [processingIndex, setProcessingIndex] = useState<string | null>(null);
   const [isCheckingSafety, setIsCheckingSafety] = useState<boolean>(false);
   const [safetyCheckResult, setSafetyCheckResult] = useState<SafetyCheckResult | null>(null);
+  const [userApiKey, setUserApiKey] = useLocalStorage<string>('gemini-api-key', '');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   
   // ComfyUI State
   const [comfyUiServerAddress, setComfyUiServerAddress] = useLocalStorage<string>('comfy-address', 'http://127.0.0.1:8188');
@@ -365,10 +368,16 @@ const App: React.FC = () => {
   }, [theme, customThemes, setTheme, previewTheme]);
 
   const handleGenerate = useCallback(async () => {
+    if (!userApiKey) {
+        setStatusMessage({ text: "Please enter your Gemini API key first.", type: 'warning' });
+        setIsApiKeyModalOpen(true);
+        return;
+    }
     if (!prompt.trim()) { setStatusMessage({text: "Please enter a prompt.", type: 'error' }); return; }
+
     setIsLoading(true); setStatusMessage(null); setSafetyCheckResult(null);
     try {
-      const generatedDataUrls = await generateImagesFromPrompt(prompt, config, uploadedImage, customStyles);
+      const generatedDataUrls = await geminiService.generateImagesFromPrompt(prompt, config, uploadedImage, customStyles, userApiKey);
       const newEntries: GenerationHistoryEntry[] = generatedDataUrls.map(url => ({ 
           id: crypto.randomUUID(), 
           imageDataUrl: url, 
@@ -382,7 +391,7 @@ const App: React.FC = () => {
     } catch (err) {
       setStatusMessage({ text: err instanceof Error ? err.message : 'An unknown error occurred.', type: 'error' });
     } finally { setIsLoading(false); }
-  }, [prompt, config, uploadedImage, customStyles]);
+  }, [prompt, config, uploadedImage, customStyles, userApiKey]);
 
   const handlePrimarySubmit = useCallback(() => {
     if (config.model === 'comfyui-local') {
@@ -445,21 +454,23 @@ const App: React.FC = () => {
   };
 
   const handleEnhancePrompt = useCallback(async () => {
+    if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
     if (!prompt.trim()) return;
     setIsEnhancing(true); setStatusMessage(null);
     try {
-      const enhancedPrompt = await enhancePromptWithGemini(prompt);
+      const enhancedPrompt = await geminiService.enhancePromptWithGemini(prompt, userApiKey);
       setPrompt(enhancedPrompt);
     } catch (err) { setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
     } finally { setIsEnhancing(false); }
-  }, [prompt]);
+  }, [prompt, userApiKey]);
 
   const handleSuggestNegativePrompt = useCallback(async () => {
+    if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
     if (!prompt.trim()) return;
     setIsSuggestingNegative(true);
     setStatusMessage({ text: 'Generating negative prompt suggestions...', type: 'info' });
     try {
-      const suggestion = await suggestNegativePrompt(prompt);
+      const suggestion = await geminiService.suggestNegativePrompt(prompt, userApiKey);
       setConfig(prevConfig => {
         // Create a set of existing tags for easy de-duplication
         const existingTags = new Set(prevConfig.negativePrompt.split(',').map(t => t.trim()).filter(Boolean));
@@ -479,22 +490,24 @@ const App: React.FC = () => {
     } finally {
       setIsSuggestingNegative(false);
     }
-  }, [prompt, setConfig]);
+  }, [prompt, setConfig, userApiKey]);
 
   const handleCheckPromptSafety = useCallback(async () => {
+    if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
     if (!prompt.trim()) return;
     setIsCheckingSafety(true); setStatusMessage(null);
     try {
-        setSafetyCheckResult(await checkPromptSafety(prompt));
+        setSafetyCheckResult(await geminiService.checkPromptSafety(prompt, userApiKey));
     } catch (err) { setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
     } finally { setIsCheckingSafety(false); }
-  }, [prompt]);
+  }, [prompt, userApiKey]);
 
   const handlePostProcess = useCallback(async (id: string, imageUrl: string, processPrompt: string) => {
+    if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
     setProcessingIndex(id);
     setStatusMessage(null);
     try {
-        const newImage = await postProcessImage(imageUrl, processPrompt);
+        const newImage = await geminiService.postProcessImage(imageUrl, processPrompt, userApiKey);
         
         const originalEntry = history.find(entry => entry.id === id);
         if (!originalEntry) return;
@@ -522,16 +535,17 @@ const App: React.FC = () => {
     } finally { 
         setProcessingIndex(null); 
     }
-  }, [history]);
+  }, [history, userApiKey]);
   
   const handleMagicEditSubmit = useCallback(async (editPrompt: string) => {
+    if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
     if (!editPrompt || !magicEditState.imageData || !magicEditState.imageId) return;
     const { imageId, imageData } = magicEditState;
 
     setMagicEditState(prev => ({ ...prev, isLoading: true }));
     setStatusMessage(null);
     try {
-      const newImage = await postProcessImage(imageData, editPrompt);
+      const newImage = await geminiService.postProcessImage(imageData, editPrompt, userApiKey);
       
       const originalEntry = history.find(entry => entry.id === imageId);
       if (!originalEntry) return;
@@ -561,12 +575,12 @@ const App: React.FC = () => {
       setStatusMessage({ text: err instanceof Error ? err.message : String(err), type: 'error' });
       setMagicEditState(prev => ({ ...prev, isLoading: false }));
     }
-  }, [history, magicEditState.imageId, magicEditState.imageData]);
+  }, [history, magicEditState.imageId, magicEditState.imageData, userApiKey]);
 
-  const handleEnhanceImage = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, ENHANCE_PROMPT);
-  const handleFixFace = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, FACE_FIX_PROMPT);
-  const handleUpscaleImage = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, UPSCALE_PROMPT);
-  const handleRemoveWatermark = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, REMOVE_WATERMARK_PROMPT);
+  const handleEnhanceImage = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, geminiService.ENHANCE_PROMPT);
+  const handleFixFace = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, geminiService.FACE_FIX_PROMPT);
+  const handleUpscaleImage = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, geminiService.UPSCALE_PROMPT);
+  const handleRemoveWatermark = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, geminiService.REMOVE_WATERMARK_PROMPT);
   const handleOpenMagicEdit = (id: string, imageUrl: string) => {
     setMagicEditState({
       isOpen: true,
@@ -804,7 +818,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-transparent text-text-primary font-sans flex flex-col">
       <div className="fixed inset-0 bg-bg-primary -z-10"></div>
-      <Header onOpenHistory={() => setIsHistoryOpen(true)} theme={theme} setTheme={setTheme} onOpenThemeEditor={() => setIsThemeEditorOpen(true)} customThemes={customThemes} onHeaderClick={handleHeaderClick} />
+      <Header onOpenHistory={() => setIsHistoryOpen(true)} theme={theme} setTheme={setTheme} onOpenThemeEditor={() => setIsThemeEditorOpen(true)} customThemes={customThemes} onHeaderClick={handleHeaderClick} onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)} />
       <main ref={mainRef} className="container mx-auto p-4 md:p-6 flex-grow">
         <div className="max-w-4xl mx-auto space-y-6">
           <ImagePromptForm 
@@ -926,6 +940,12 @@ const App: React.FC = () => {
         );
       })()}
       
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        apiKey={userApiKey}
+        onSaveApiKey={setUserApiKey}
+      />
       <RecipeManagerModal
         isOpen={isRecipeManagerOpen}
         onClose={() => setIsRecipeManagerOpen(false)}

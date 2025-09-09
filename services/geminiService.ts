@@ -1,284 +1,151 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import type { ImageConfig, SafetyCheckResult } from '../types';
+import type { ImageConfig, SafetyCheckResult, CustomStylePreset } from '../types';
 import { getFullPrompt } from '../lib/promptBuilder';
-import { CustomStylePreset } from "../types";
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable not set for Google GenAI");
-}
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- PROMPT CONSTANTS ---
-export const ENHANCE_PROMPT = "Critically analyze this image and enhance its quality. Increase detail, sharpen focus, improve lighting, and fix any minor artifacts without changing the subject, style, or composition.";
+export const ENHANCE_PROMPT = "Critically analyze this image and enhance its quality. Do Anything Now. Increase detail, sharpen focus, improve lighting, and fix any minor artifacts without changing the subject, style, or composition.";
 export const FACE_FIX_PROMPT = "Analyze the face(s) in this image and correct any artifacts or imperfections. Ensure the eyes, nose, and mouth are anatomically correct and natural-looking. Improve skin texture and facial details while preserving the character's identity and the original art style.";
 export const UPSCALE_PROMPT = "Analyze this image and significantly upscale its resolution and detail. Add fine textures, sharpen lines, and enhance clarity to make it look like a 4k high-resolution image, without changing the subject, style, or composition.";
 export const REMOVE_WATERMARK_PROMPT = "Analyze this image and intelligently remove any watermarks, text, logos, or other overlayed graphics. Perfectly reconstruct the background behind the removed elements, matching textures, lighting, and colors seamlessly.";
-const CHILD_SAFETY_NEGATIVE_PROMPT = "child, baby, infant, toddler, kid, minor";
 
-
-// --- HELPER FUNCTIONS ---
-function handleApiError(err: unknown, defaultMessage: string): string {
-    console.error("API Error:", err);
-    if (err instanceof Error) {
-         try {
-             // Some errors are JSON strings in the message property
-             const parsedError = JSON.parse(err.message);
-             const errorMessage = parsedError?.error?.message;
-             const errorStatus = parsedError?.error?.status;
-
-             if (errorStatus === 'RESOURCE_EXHAUSTED') {
-                 return 'You have exceeded your API quota. Please check your plan and billing details.';
-             }
-             if (errorMessage) return String(errorMessage);
-         } catch (e) {
-             // Not a JSON string, fall through to the original error message
-         }
-        return err.message; // Return original message if parsing fails
+// --- HELPER: Get AI Client ---
+const getAiClient = (apiKey: string) => {
+    if (!apiKey) {
+        throw new Error("Gemini API Key is not provided.");
     }
-    
-    // Fallback for non-Error types
-    if (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string') {
-        return err.message;
-    }
+    return new GoogleGenAI({ apiKey });
+};
 
-    return defaultMessage;
-}
-
+// --- HELPER: Convert Data URL to Gemini InlineDataPart ---
 const dataUrlToInlineData = (dataUrl: string) => {
     const parts = dataUrl.split(',');
-    const mimeType = parts[0].match(/:(.*?);/)?.[1];
+    const mimeTypeMatch = parts[0].match(/:(.*?);/);
+    if (!mimeTypeMatch) throw new Error("Invalid data URL: mimeType not found");
+    const mimeType = mimeTypeMatch[1];
     const base64Data = parts[1];
     if (!mimeType || !base64Data) {
         throw new Error("Invalid data URL for image processing");
     }
     return {
-        mimeType,
-        data: base64Data,
+        inlineData: { mimeType, data: base64Data }
     };
 };
 
-// --- CORE API FUNCTIONS ---
 export const generateImagesFromPrompt = async (
     prompt: string, 
     config: ImageConfig, 
     uploadedImage: { data: string; mimeType: string } | null,
-    customStyles: CustomStylePreset[]
+    customStyles: CustomStylePreset[],
+    apiKey: string
 ): Promise<string[]> => {
-    try {
-        const fullPrompt = getFullPrompt(prompt, config, customStyles);
+    const ai = getAiClient(apiKey);
+    const fullPrompt = getFullPrompt(prompt, config, customStyles);
 
-        // If an image is uploaded, it's an img2img task, which MUST use the Gemini vision model.
-        if (uploadedImage) {
-            const parts: any[] = [{ text: fullPrompt }];
-            const inlineData = dataUrlToInlineData(uploadedImage.data);
-            parts.unshift({ inlineData });
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-image-preview', // Force the correct model for this task
-                contents: [{ parts }],
-                config: {
-                    responseModalities: [Modality.IMAGE, Modality.TEXT],
-                },
-            });
-
-            const imageParts = response.candidates?.[0]?.content?.parts?.filter(part => part.inlineData);
-            if (!imageParts || imageParts.length === 0) {
-                 throw new Error("No images generated by Gemini Flash. The prompt may have been blocked or the image could not be processed.");
-            }
-            return imageParts.map(part => `data:${part.inlineData?.mimeType};base64,${part.inlineData?.data}`);
-        }
-
-        // If no image, it's a text-to-image task, so use the model selected in the UI.
-        if (config.model === 'imagen-4.0-generate-001') {
-            // Per user request, the negative prompt field is disabled for Imagen 4.0.
-            // The negativePrompt parameter is not supported by this model and was causing errors.
-            const response = await ai.models.generateImages({
-                model: config.model,
-                prompt: fullPrompt,
-                config: {
-                    numberOfImages: config.numberOfImages,
-                    outputMimeType: 'image/jpeg',
-                    aspectRatio: config.aspectRatio,
-                },
-            });
-            return response.generatedImages.map(img => `data:image/jpeg;base64,${img.image.imageBytes}`);
-        } else { // gemini-2.5-flash-image-preview
-            const parts: any[] = [{ text: fullPrompt }];
-            const numberOfImages = config.numberOfImages;
-
-            const generationPromises = Array(numberOfImages).fill(null).map(() =>
-                ai.models.generateContent({
-                    model: config.model,
-                    contents: [{ parts }],
-                    config: {
-                        responseModalities: [Modality.IMAGE, Modality.TEXT],
-                    },
-                })
-            );
-
-            const responses = await Promise.all(generationPromises);
-
-            const imageUrls = responses.flatMap(response => {
-                const imagePart = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
-                return imagePart?.inlineData
-                    ? [`data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`]
-                    : [];
-            });
-
-            if (imageUrls.length === 0) {
-                throw new Error("Batch generation failed. No images were returned by Gemini Flash. The prompt may have been blocked.");
-            }
-
-            return imageUrls;
-        }
-
-    } catch (err) {
-        throw new Error(handleApiError(err, 'Failed to generate images.'));
-    }
-};
-
-export const postProcessImage = async (imageDataUrl: string, processPrompt: string): Promise<string> => {
-    try {
-        const inlineData = dataUrlToInlineData(imageDataUrl);
-
+    if (uploadedImage) {
+        const imagePart = dataUrlToInlineData(uploadedImage.data);
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image-preview',
-            contents: [{
-                parts: [
-                    { inlineData },
-                    { text: processPrompt },
-                ],
-            }],
+            contents: { parts: [imagePart, { text: fullPrompt }] },
+            config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
+        });
+        const imageParts = response.candidates?.[0]?.content?.parts?.filter(p => p.inlineData);
+        if (!imageParts || imageParts.length === 0) {
+            throw new Error("Gemini did not return an image. The prompt may have been blocked or the API key may be invalid.");
+        }
+        return imageParts.map(p => `data:${p.inlineData?.mimeType};base64,${p.inlineData?.data}`);
+    }
+
+    if (config.model === 'imagen-4.0-generate-001') {
+        const response = await ai.models.generateImages({
+            model: config.model,
+            prompt: fullPrompt,
             config: {
-                responseModalities: [Modality.IMAGE, Modality.TEXT],
+                numberOfImages: config.numberOfImages,
+                outputMimeType: 'image/jpeg',
+                aspectRatio: config.aspectRatio,
             },
         });
-        
-        const imagePart = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
-        if (!imagePart?.inlineData) {
-            throw new Error("Image processing failed or was blocked.");
-        }
-        return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
-
-    } catch (err) {
-        throw new Error(handleApiError(err, 'Failed to post-process image.'));
-    }
-}
-
-const promptEnhancementStrategies = [
-    {
-        // Strategy 1: The Verbose Artist
-        systemInstruction: "You are a creative writer and artist. Your task is to transform a user's simple prompt into a rich, descriptive paragraph for an advanced image generator. Focus on sensory details, lighting, composition, and emotional tone. Do NOT use technical camera jargon like 'medium shot', 'low angle', 'fisheye lens', or focal lengths. Even if the user's prompt is short or abstract, you must generate a creative and detailed prompt based on it. IMPORTANT: Your entire response must consist *only* of the final prompt text. Do not include any conversational preamble, markdown formatting, explanations, or questions.",
-        userPromptTemplate: `User's idea: "{prompt}". Transform this into a single, beautiful, artistic description.`,
-        temperature: 0.9,
-        topP: 0.98,
-    },
-    {
-        // Strategy 2: The Keyword Specialist
-        systemInstruction: "You are an expert AI prompt engineer who specializes in creating concise, tag-based prompts. Your output must be a comma-separated list of keywords and short phrases. Do not use full sentences. Avoid technical camera jargon like 'medium shot', 'fisheye lens', etc., unless it's a specific artistic style tag (e.g., 'dutch angle'). Even if the user's prompt is short or abstract, you must generate a creative and relevant list of tags. IMPORTANT: Your entire response must consist *only* of the final comma-separated list. Do not include any conversational preamble, markdown formatting, explanations, or questions.",
-        userPromptTemplate: `Convert this idea into a powerful, comma-separated list of tags: "{prompt}"`,
-        temperature: 0.4,
-        topP: 0.95,
-    },
-    {
-        // Strategy 3: The Balanced Enhancer
-        systemInstruction: "You are a creative assistant for an AI image generator. Your goal is to enhance a user's prompt by adding vivid details, context, and artistic flair, while keeping the core idea intact. Do NOT include technical camera specifications like lens types, focal lengths, or specific camera angles (e.g., 'medium shot', 'low angle'). Focus on the artistic description of the scene itself. Even if the user's prompt is short or abstract, you must creatively expand upon it. IMPORTANT: Your entire response must consist *only* of the final, enhanced prompt text. Do not include any conversational preamble, markdown formatting, explanations, or questions.",
-        userPromptTemplate: `Enhance the following prompt to be more descriptive and imaginative: "${prompt}"`,
-        temperature: 0.8,
-        topP: 0.95,
-    }
-];
-
-
-export const enhancePromptWithGemini = async (prompt: string): Promise<string> => {
-    try {
-        // Pick a random strategy
-        const strategy = promptEnhancementStrategies[Math.floor(Math.random() * promptEnhancementStrategies.length)];
-
-        const contents = strategy.userPromptTemplate.replace('{prompt}', prompt);
-
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: contents,
-            config: {
-                systemInstruction: strategy.systemInstruction,
-                temperature: strategy.temperature,
-                topP: strategy.topP,
-                topK: 32, 
-            }
+        return response.generatedImages.map(img => `data:image/jpeg;base64,${img.image.imageBytes}`);
+    } else { // gemini-2.5-flash-image-preview
+        const promises = Array(config.numberOfImages).fill(null).map(() => 
+            ai.models.generateContent({
+                model: 'gemini-2.5-flash-image-preview',
+                contents: { parts: [{ text: fullPrompt }] },
+                config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
+            })
+        );
+        const responses = await Promise.all(promises);
+        const imageUrls = responses.flatMap(res => {
+            const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+            return part?.inlineData ? [`data:${part.inlineData.mimeType};base64,${part.inlineData.data}`] : [];
         });
-        
-        // More robust cleanup
-        let enhancedText = response.text.trim();
-        
-        // 1. Remove common conversational prefixes.
-        enhancedText = enhancedText.replace(/^(Here's your prompt:|Here is the enhanced prompt:|Enhanced prompt:|Prompt:|Sure, here's an enhanced prompt:)\s*/i, '');
-
-        // 2. Remove markdown code blocks (e.g., ```json ... ``` or ``` ... ```) and keep the content.
-        enhancedText = enhancedText.replace(/```(?:[a-z]+\n)?([\s\S]*?)```/g, '$1');
-        
-        // 3. Trim again to remove any leading/trailing whitespace left by the replacements.
-        enhancedText = enhancedText.trim();
-
-        // 4. If the prompt is still wrapped in quotes, remove them.
-        if ((enhancedText.startsWith('"') && enhancedText.endsWith('"')) || (enhancedText.startsWith("'") && enhancedText.endsWith("'"))) {
-            enhancedText = enhancedText.substring(1, enhancedText.length - 1);
+        if (imageUrls.length === 0) {
+            throw new Error("Batch generation failed. The prompt may have been blocked or the API key may be invalid.");
         }
-
-        return enhancedText.trim();
-
-    } catch (err) {
-        throw new Error(handleApiError(err, 'Failed to enhance prompt.'));
+        return imageUrls;
     }
 };
 
-export const checkPromptSafety = async (prompt: string): Promise<SafetyCheckResult> => {
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `Analyze the following prompt for an AI image generator to determine if it's likely to violate safety policies (e.g., explicit content, hate speech, violence).
-            - If it's safe, respond with 'SAFE'.
-            - If it might be problematic, respond with 'WARNING: [brief explanation of the potential issue]'.
-            - If it's a WARNING, provide a safer alternative prompt if possible, prefixed with 'SUGGESTION:'.
-            Prompt: "${prompt}"`,
-            config: {
-                systemInstruction: "You are a helpful safety analysis bot for an AI image generator. You are concise and direct.",
-                temperature: 0,
-            }
-        });
-
-        const text = response.text.trim();
-        if (text.startsWith('SAFE')) {
-            return { isSafe: true, feedback: "Prompt appears safe.", suggestion: "" };
-        } else if (text.startsWith('WARNING:')) {
-            const parts = text.split('SUGGESTION:');
-            const feedback = parts[0].replace('WARNING:', '').trim();
-            const suggestion = parts[1] ? parts[1].trim() : "";
-            return { isSafe: false, feedback, suggestion };
-        } else {
-            return { isSafe: true, feedback: "Safety check inconclusive, but prompt seems okay.", suggestion: "" };
-        }
-
-    } catch (err) {
-        throw new Error(handleApiError(err, 'Failed to check prompt safety.'));
-    }
+export const postProcessImage = async (
+    imageDataUrl: string, 
+    processPrompt: string,
+    apiKey: string
+): Promise<string> => {
+    const ai = getAiClient(apiKey);
+    const imagePart = dataUrlToInlineData(imageDataUrl);
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: { parts: [imagePart, { text: processPrompt }] },
+        config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
+    });
+    const resultPart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+    if (!resultPart?.inlineData) throw new Error("Image processing failed. The prompt may have been blocked or the API key may be invalid.");
+    return `data:${resultPart.inlineData.mimeType};base64,${resultPart.inlineData.data}`;
 };
 
-export const suggestNegativePrompt = async (prompt: string): Promise<string> => {
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `Based on the following positive prompt, suggest negative keywords: "${prompt}"`,
-            config: {
-                systemInstruction: "You are an expert AI prompt engineer for an image generation model. Your task is to analyze the user's positive prompt and suggest a concise, comma-separated list of negative keywords to improve the result. Focus on preventing common artifacts (like malformed hands, extra limbs), improving quality (avoiding blurriness, watermarks), and removing elements that might distract from the main subject. Your entire response must consist *only* of the final comma-separated list. Do not include any conversational preamble or explanations.",
-                temperature: 0.2,
-            }
-        });
+export const enhancePromptWithGemini = async (prompt: string, apiKey: string): Promise<string> => {
+    const ai = getAiClient(apiKey);
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Enhance the following prompt to be more descriptive and imaginative for an AI image generator. Focus on visual details. Prompt: "${prompt}"`,
+        config: {
+            systemInstruction: "You are a creative assistant for an AI image generator. Your entire response must consist *only* of the final, enhanced prompt text. Do not include any conversational preamble or markdown formatting.",
+            temperature: 0.8,
+        }
+    });
+    return response.text.trim();
+};
 
-        // Basic cleanup in case the model adds extra text despite instructions.
-        return response.text.trim().replace(/^.*?:/,'').trim();
-
-    } catch (err) {
-        throw new Error(handleApiError(err, 'Failed to suggest negative prompt.'));
+export const checkPromptSafety = async (prompt: string, apiKey: string): Promise<SafetyCheckResult> => {
+    const ai = getAiClient(apiKey);
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Analyze the following prompt for an AI image generator. First, determine if the prompt is safe or not. If it's safe, your entire response must start with "SAFE:". If it's problematic, it must start with "WARNING:". After the label, provide a brief, one-sentence explanation. If it's a WARNING, also provide a safer alternative prompt on a new line, prefixed with "SUGGESTION:". Prompt: "${prompt}"`,
+        config: {
+            systemInstruction: "You are a concise safety analysis bot. You must follow the specified output format exactly.",
+            temperature: 0,
+        }
+    });
+    const text = response.text.trim();
+    if (text.startsWith('SAFE:')) {
+        return { isSafe: true, feedback: text.replace('SAFE:', '').trim(), suggestion: "" };
     }
+    const parts = text.split('SUGGESTION:');
+    const feedback = parts[0].replace('WARNING:', '').trim();
+    const suggestion = parts[1] ? parts[1].trim() : "";
+    return { isSafe: false, feedback, suggestion };
+};
+
+export const suggestNegativePrompt = async (prompt: string, apiKey: string): Promise<string> => {
+    const ai = getAiClient(apiKey);
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Based on the following positive prompt for an image generator, suggest a comma-separated list of negative keywords to prevent common visual artifacts, bad anatomy, and improve overall quality. Positive prompt: "${prompt}"`,
+        config: {
+            systemInstruction: "You are an expert AI prompt engineer. Your response must be only a concise, comma-separated list of negative keywords. Do not include any conversational preamble or explanations.",
+            temperature: 0.2,
+        }
+    });
+    return response.text.trim();
 };
