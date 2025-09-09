@@ -12,9 +12,10 @@ Note: There will be more options in the future when I can deploy it on other pla
 - **Prerequisites:**  Node.js
 
 1. Install dependencies:
-   `npm install ai @ai-sdk/google @vercel/kv`
-3. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-4. Run the app:
+   
+   `npm i ai @ai-sdk/google @vercel/kv uuid`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
    `npm run dev`
    
 ## Option 2) Run with Vercel
