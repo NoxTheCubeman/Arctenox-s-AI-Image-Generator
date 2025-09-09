@@ -18,3 +18,12 @@ export async function assertAndConsume(id?: string) {
   if (uses > SESSION_RATE_LIMIT) throw new Error('Session quota exceeded');
   return true;
 }
+import { NextResponse } from 'next/server';
+import { createSession } from '@/lib/session';
+
+export async function POST() {
+  const id = await createSession();
+  const res = NextResponse.json({ sessionKey: id });
+  res.cookies.set('sessionKey', id, { httpOnly: true, secure: true });
+  return res;
+}
