@@ -17,9 +17,10 @@ export default defineConfig(({ mode }) => {
             }
         },
         define: {
-            // Expose the VITE_API_KEY to the client-side code as process.env.API_KEY
-            // This allows for a production key to be set during the build process.
-            'process.env.API_KEY': JSON.stringify(env.VITE_API_KEY)
+            // Expose the VITE_API_KEY to the client-side code as process.env.API_KEY.
+            // If VITE_API_KEY is not set, define it as an empty string to ensure
+            // process.env.API_KEY is falsy, allowing fallback logic to work correctly.
+            'process.env.API_KEY': JSON.stringify(env.VITE_API_KEY || '')
         }
     }
 });
