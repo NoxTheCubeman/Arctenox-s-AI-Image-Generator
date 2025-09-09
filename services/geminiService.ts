@@ -11,12 +11,10 @@ export const REMOVE_WATERMARK_PROMPT = "Analyze this image and intelligently rem
 
 // --- HELPER: Get AI Client ---
 const getAiClient = () => {
-    // FIX: The API key MUST be obtained from the environment variable `process.env.API_KEY` as per the guidelines.
+    // The API_KEY is expected to be set in the environment by the build tool (e.g., Vite).
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-        // As per guidelines, the key's availability is a hard requirement.
-        // The app should not ask the user for it. This error indicates a deployment issue.
-        throw new Error("API key not found. The `process.env.API_KEY` environment variable must be set.");
+        throw new Error("API Key not found. The application is missing its API_KEY environment variable.");
     }
     return new GoogleGenAI({ apiKey });
 };
