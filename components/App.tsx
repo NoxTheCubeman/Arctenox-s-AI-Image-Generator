@@ -372,11 +372,21 @@ const App: React.FC = () => {
     let messageType: StatusMessageProps['type'] = 'error';
 
     if (err instanceof Error) {
-        errorMessage = err.message;
-        // Check for the specific 429 rate limit error from Google API
-        if (errorMessage.includes('429') && (errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('exceeded your current quota'))) {
-            errorMessage = "API Rate Limit Exceeded. You've made too many requests with your key recently. Please wait a minute and try again, or check your Google AI Studio dashboard for quota details.";
+        const message = err.message.toLowerCase();
+
+        if (message.includes('400') && (message.includes('api key not valid') || message.includes('invalid'))) {
+            errorMessage = "API Key Not Valid. Please double-check that the key you entered is correct, complete, and has no extra spaces or characters. A valid key starts with 'AIzaSy'.";
+        } else if (message.includes('403') && message.includes('permission denied')) {
+            errorMessage = "Permission Denied. Your API key is valid, but it doesn't have permission to use the Gemini API. Please ensure the 'Generative Language API' is enabled in your Google Cloud project.";
+        } else if (message.includes('429') && (message.includes('resource_exhausted') || message.includes('quota'))) {
+            errorMessage = "API Rate Limit Exceeded. You've made too many requests with this key. Please wait a minute and try again, or check your Google Cloud project for quota details.";
             messageType = 'warning';
+        } else if (message.includes('500') || message.includes('503')) {
+             errorMessage = "Google Server Error. The AI service is temporarily unavailable. Please try again in a few moments.";
+             messageType = 'warning';
+        } else {
+             // Default to the original error message for unexpected errors
+             errorMessage = err.message;
         }
     }
     
@@ -526,338 +536,253 @@ const App: React.FC = () => {
     setStatusMessage(null);
     try {
         const newImage = await geminiService.postProcessImage(imageUrl, processPrompt, userApiKey);
-        
-        const originalEntry = history.find(entry => entry.id === id);
-        if (!originalEntry) return;
-
-        const newEntry: GenerationHistoryEntry = { 
-            ...originalEntry, 
-            id: crypto.randomUUID(), 
-            imageDataUrl: newImage, 
-            prompt: `Post-process: ${processPrompt}`,
-            timestamp: Date.now()
+        const newEntry: GenerationHistoryEntry = {
+            id: crypto.randomUUID(),
+            imageDataUrl: newImage,
+            prompt: `Post-processed: ${processPrompt}`,
+            config,
+            uploadedImage: { data: imageUrl, mimeType: 'image/png' },
+            timestamp: Date.now(),
         };
-
         await dbService.addHistoryEntry(newEntry);
-        await dbService.deleteHistoryEntry(id);
-
-        setHistory(currentHistory => {
-            const index = currentHistory.findIndex(entry => entry.id === id);
-            if (index === -1) return currentHistory; 
-            const updatedHistory = [...currentHistory];
-            updatedHistory[index] = newEntry;
-            return updatedHistory;
-        });
-    } catch (err) { 
+        setHistory(prev => [newEntry, ...prev].slice(0, MAX_HISTORY_SIZE));
+    } catch (err) {
         handleApiError(err);
-    } finally { 
-        setProcessingIndex(null); 
+    } finally {
+        setProcessingIndex(null);
     }
-  }, [history, userApiKey]);
-  
-  const handleMagicEditSubmit = useCallback(async (editPrompt: string) => {
-    if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
-    if (!editPrompt || !magicEditState.imageData || !magicEditState.imageId) return;
-    const { imageId, imageData } = magicEditState;
+}, [config, userApiKey]);
 
+  const handleMagicEdit = useCallback(async (editPrompt: string) => {
+    if (!userApiKey || !magicEditState.imageData || !magicEditState.imageId) {
+        setStatusMessage({ text: "An error occurred with Magic Edit.", type: 'error' });
+        return;
+    }
     setMagicEditState(prev => ({ ...prev, isLoading: true }));
     setStatusMessage(null);
     try {
-      const newImage = await geminiService.postProcessImage(imageData, editPrompt, userApiKey);
-      
-      const originalEntry = history.find(entry => entry.id === imageId);
-      if (!originalEntry) return;
+        const newImage = await geminiService.postProcessImage(magicEditState.imageData, editPrompt, userApiKey);
+        const newEntry: GenerationHistoryEntry = {
+            id: crypto.randomUUID(),
+            imageDataUrl: newImage,
+            prompt: `Magic Edit: "${editPrompt}"`,
+            config: { ...config, model: 'gemini-2.5-flash-image-preview' }, // Magic edit always uses Gemini
+            uploadedImage: { data: magicEditState.imageData, mimeType: 'image/png' },
+            timestamp: Date.now(),
+        };
+        await dbService.addHistoryEntry(newEntry);
+        setHistory(prev => [newEntry, ...prev].slice(0, MAX_HISTORY_SIZE));
+        setMagicEditState({ isOpen: false, imageId: null, imageData: null, isLoading: false });
+    } catch (err) {
+        handleApiError(err);
+    } finally {
+        setMagicEditState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, [config, magicEditState.imageData, magicEditState.imageId, userApiKey]);
 
-      const newEntry: GenerationHistoryEntry = { 
-          ...originalEntry, 
-          id: crypto.randomUUID(), 
-          imageDataUrl: newImage, 
-          prompt: `Magic Edit: ${editPrompt}`,
-          timestamp: Date.now()
-      };
+  const handleSyncComfyImages = async (options?: { closeModal?: boolean }) => {
+    try {
+      const syncedImages = await comfyuiService.fetchRecentImages(comfyUiServerAddress);
+      if (syncedImages.length === 0) {
+        setStatusMessage({ text: 'No new images found in ComfyUI history.', type: 'info' });
+        return;
+      }
 
-      await dbService.addHistoryEntry(newEntry);
-      await dbService.deleteHistoryEntry(imageId);
-      
-      setHistory(currentHistory => {
-        const index = currentHistory.findIndex(entry => entry.id === imageId);
-        if (index === -1) return currentHistory;
+      const newHistoryEntries: GenerationHistoryEntry[] = syncedImages.map(img => ({
+          id: crypto.randomUUID(),
+          imageDataUrl: img.imageDataUrl,
+          prompt: img.prompt,
+          config: { ...config, model: 'comfyui-local' }, // Assume comfy model
+          uploadedImage: null,
+          timestamp: Date.now(),
+          comfyUiWorkflow: img.workflowJson,
+          comfyUiFilename: img.filename,
+      }));
 
-        const updatedHistory = [...currentHistory];
-        updatedHistory[index] = newEntry;
-        return updatedHistory;
-      });
+      // Deduplicate before adding
+      const existingFilenames = new Set(history.map(h => h.comfyUiFilename).filter(Boolean));
+      const entriesToAdd = newHistoryEntries.filter(e => !existingFilenames.has(e.comfyUiFilename));
 
-      setMagicEditState({ isOpen: false, imageData: null, imageId: null, isLoading: false });
+      if (entriesToAdd.length > 0) {
+          await dbService.addMultipleHistoryEntries(entriesToAdd);
+          setHistory(prev => [...entriesToAdd, ...prev].slice(0, MAX_HISTORY_SIZE));
+          setStatusMessage({ text: `Synced ${entriesToAdd.length} new image(s) from ComfyUI.`, type: 'success' });
+      } else {
+           setStatusMessage({ text: 'All recent ComfyUI images are already in your history.', type: 'info' });
+      }
+
+      if (options?.closeModal) {
+          setIsComfyEmbedOpen(false);
+      }
+
     } catch (err) {
       handleApiError(err);
-      setMagicEditState(prev => ({ ...prev, isLoading: false }));
     }
-  }, [history, magicEditState.imageId, magicEditState.imageData, userApiKey]);
-
-  const handleEnhanceImage = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, geminiService.ENHANCE_PROMPT);
-  const handleFixFace = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, geminiService.FACE_FIX_PROMPT);
-  const handleUpscaleImage = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, geminiService.UPSCALE_PROMPT);
-  const handleRemoveWatermark = (id: string, imageUrl: string) => handlePostProcess(id, imageUrl, geminiService.REMOVE_WATERMARK_PROMPT);
-  const handleOpenMagicEdit = (id: string, imageUrl: string) => {
-    setMagicEditState({
-      isOpen: true,
-      imageData: imageUrl,
-      imageId: id,
-      isLoading: false,
-    });
   };
 
-  const handleDownloadImage = (imageDataUrl: string) => {
-    const link = document.createElement('a');
-    link.href = imageDataUrl;
-    link.download = `generated-image-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleSendToComfyCanvas = async (id: string, imageUrl: string) => {
+      setSendingToComfyId(id);
+      try {
+          const nodeData = await comfyuiService.uploadAndPrepareNodeData(comfyUiServerAddress, imageUrl);
+          setNodeToCopy(nodeData);
+          setIsComfyEmbedOpen(true);
+      } catch (err) {
+          setStatusMessage({ text: err instanceof Error ? err.message : 'Failed to send image.', type: 'error' });
+      } finally {
+          setSendingToComfyId(null);
+      }
   };
+
+  const handleImageAction = (action: (imageUrl: string, prompt: string, apiKey: string) => Promise<string>, prompt: string) => 
+    (id: string, imageUrl: string) => {
+        if (!userApiKey) { setStatusMessage({ text: "API key required.", type: 'warning' }); setIsApiKeyModalOpen(true); return; }
+        setProcessingIndex(id);
+        setStatusMessage(null);
+        action(imageUrl, prompt, userApiKey)
+            .then(newImage => {
+                const newEntry: GenerationHistoryEntry = {
+                    id: crypto.randomUUID(),
+                    imageDataUrl: newImage,
+                    prompt: `${prompt.split(' ')[0]}: ${history.find(h => h.id === id)?.prompt || ''}`,
+                    config,
+                    uploadedImage: { data: imageUrl, mimeType: 'image/png' },
+                    timestamp: Date.now()
+                };
+                 dbService.addHistoryEntry(newEntry);
+                setHistory(prev => [newEntry, ...prev].slice(0, MAX_HISTORY_SIZE));
+            })
+            .catch(err => handleApiError(err))
+            .finally(() => setProcessingIndex(null));
+    };
+
+  const handleEnhanceImage = handleImageAction(geminiService.postProcessImage, geminiService.ENHANCE_PROMPT);
+  const handleFixFace = handleImageAction(geminiService.postProcessImage, geminiService.FACE_FIX_PROMPT);
+  const handleUpscale = handleImageAction(geminiService.postProcessImage, geminiService.UPSCALE_PROMPT);
+  const handleRemoveWatermark = handleImageAction(geminiService.postProcessImage, geminiService.REMOVE_WATERMARK_PROMPT);
   
   const handleCopyImage = async (imageDataUrl: string) => {
       try {
-          if (!navigator.clipboard?.write) {
-              throw new Error("Clipboard API not available. Your browser might be blocking it or be outdated.");
-          }
-          const response = await fetch(imageDataUrl);
-          const blob = await response.blob();
-          await navigator.clipboard.write([
-              new ClipboardItem({
-                  [blob.type]: blob
-              })
-          ]);
-          setStatusMessage({ text: 'Image copied to clipboard.', type: 'success' });
+          const blob = await (await fetch(imageDataUrl)).blob();
+          await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+          setStatusMessage({ text: 'Image copied to clipboard!', type: 'success' });
       } catch (err) {
-          console.error('Failed to copy image:', err);
-          setStatusMessage({ text: 'Could not copy image. This feature may not be supported by your browser.', type: 'error' });
+          setStatusMessage({ text: 'Failed to copy image.', type: 'error' });
       }
   };
   
-  const handleUseAsInput = async (imageData: string) => {
-    try {
-        const response = await fetch(imageData);
-        const blob = await response.blob();
-        setUploadedImage({
-            data: imageData,
-            mimeType: blob.type
-        });
-        setStatusMessage({ text: 'Image set as Img2Img input.', type: 'info' });
-        mainRef.current?.scrollIntoView({ behavior: 'smooth' });
-    } catch (e) {
-        setStatusMessage({ text: 'Failed to use image as input.', type: 'error' });
-    }
+  const handleDownloadImage = (imageDataUrl: string) => {
+      const link = document.createElement('a');
+      link.href = imageDataUrl;
+      link.download = `generated-image-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
   };
   
-  const handleSendToComfyCanvas = useCallback(async (id: string, imageData: string) => {
-    if (comfyUiStatus !== 'online') {
-        setStatusMessage({ text: 'ComfyUI is offline. Please check its status and refresh the connection.', type: 'error' });
-        return;
-    }
-    setSendingToComfyId(id);
-    setStatusMessage({ text: 'Uploading image and preparing node...', type: 'info' });
+  const handleShareRecipe = async (entry: GenerationHistoryEntry) => {
+    const recipe: GenerationRecipe = {
+        id: crypto.randomUUID(),
+        name: `Recipe from ${new Date(entry.timestamp).toLocaleString()}`,
+        prompt: entry.prompt,
+        config: entry.config,
+    };
     try {
-        const nodeJson = await comfyuiService.uploadAndPrepareNodeData(comfyUiServerAddress, imageData);
-        setNodeToCopy(nodeJson);
-        setStatusMessage({ 
-            text: 'Image uploaded! Opening ComfyUI...', 
-            type: 'success' 
-        });
-        setIsComfyEmbedOpen(true);
+        await navigator.clipboard.writeText(JSON.stringify(recipe, null, 2));
+        setStatusMessage({ text: 'Generation recipe copied to clipboard!', type: 'success' });
     } catch (err) {
-        setStatusMessage({ text: err instanceof Error ? err.message : 'Failed to send image to ComfyUI.', type: 'error' });
-    } finally {
-        setSendingToComfyId(null);
-    }
-  }, [comfyUiServerAddress, comfyUiStatus]);
-  
-  const handleLoadFromHistory = (entry: GenerationHistoryEntry) => {
-    setPrompt(entry.prompt);
-    setConfig(entry.config);
-    setUploadedImage(entry.uploadedImage);
-    setIsHistoryOpen(false);
-    mainRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-  
-  const handleDeleteFromHistory = async (id: string) => {
-    try {
-        await dbService.deleteHistoryEntry(id);
-        setHistory(prev => prev.filter(entry => entry.id !== id));
-    } catch (err) {
-        console.error("Failed to delete from DB", err);
-        setStatusMessage({ text: 'Could not delete item from history.', type: 'error' });
+        setStatusMessage({ text: 'Failed to copy recipe.', type: 'error' });
     }
   };
   
-  const handleShare = (entry: GenerationHistoryEntry) => {
-      const recipe = { prompt: entry.prompt, config: entry.config };
-      navigator.clipboard.writeText(JSON.stringify(recipe, null, 2));
-      setStatusMessage({ text: 'Generation recipe copied to clipboard!', type: 'success' });
-  };
+  const handleLoadRecipe = (recipe: GenerationRecipe) => {
+    setPrompt(recipe.prompt);
+    setConfig(recipe.config);
+    setStatusMessage({text: `Loaded recipe: "${recipe.name}"`, type: 'info'});
+    setIsRecipeManagerOpen(false);
+  }
   
-  const handleSavePreset = (name: string) => {
-    const newPreset: SavedStylePreset = { id: crypto.randomUUID(), name, styles: config.styles };
-    setSavedPresets(prev => [...prev, newPreset]);
-  };
-  const handleDeletePreset = (id: string) => {
-    setSavedPresets(prev => prev.filter(p => p.id !== id));
-  };
-  const handleSaveCustomStyle = (name: string, prompt: string) => {
-    const newStyle: CustomStylePreset = { id: crypto.randomUUID(), name, prompt };
-    setCustomStyles(prev => [...prev, newStyle]);
-  };
-  const handleDeleteCustomStyle = (id: string) => {
-    setCustomStyles(prev => prev.filter(s => s.id !== id));
-    setConfig(prev => ({ ...prev, styles: prev.styles.filter(s => s !== id) }));
-  };
-  const handleApplyPreset = (styles: string[]) => setConfig(prev => ({ ...prev, styles }));
-
   const handleSaveRecipe = (name: string) => {
     const newRecipe: GenerationRecipe = {
         id: crypto.randomUUID(),
         name,
         prompt,
-        config: { ...config }
+        config,
     };
     setRecipes(prev => [...prev, newRecipe]);
   };
-  const handleDeleteRecipe = (id: string) => {
-    if (defaultRecipeId === id) {
-        setDefaultRecipeId(null);
-    }
-    setRecipes(prev => prev.filter(r => r.id !== id));
-  };
-  const handleLoadRecipe = (recipe: GenerationRecipe) => {
-    setPrompt(recipe.prompt);
-    setConfig(recipe.config);
-    setIsRecipeManagerOpen(false);
-    mainRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-  const handleSetDefaultRecipe = (id: string | null) => {
-    setDefaultRecipeId(id);
-  };
 
-  const handleSaveCustomTheme = (themeToSave: CustomTheme) => {
-    setCustomThemes(prev => {
-        const existing = prev.find(t => t.id === themeToSave.id);
-        if (existing) {
-            return prev.map(t => (t.id === themeToSave.id ? themeToSave : t));
-        }
-        return [...prev, themeToSave];
-    });
-  };
-  const handleDeleteCustomTheme = (id: string) => {
-    if (theme === id) {
-        setTheme('rat'); // Fallback to default
-    }
-    setCustomThemes(prev => prev.filter(t => t.id !== id));
-  };
-  const handleSaveWorkflow = (workflow: ComfyUIWorkflowPreset) => {
-    setComfyUiWorkflows(prev => {
-        const existingIndex = prev.findIndex(w => w.id === workflow.id);
-        if (existingIndex > -1) {
-            const updated = [...prev];
-            updated[existingIndex] = workflow;
-            return updated;
-        }
-        return [...prev, workflow];
-    });
-  };
-  const handleDeleteWorkflow = (id: string) => {
-    setComfyUiWorkflows(prev => prev.filter(w => w.id !== id));
-    if (config.selectedComfyUiWorkflowId === id) {
-      setConfig(prevConfig => ({...prevConfig, selectedComfyUiWorkflowId: 'default-t2i'}));
-    }
-  };
+  const handleLoadHistory = (entry: GenerationHistoryEntry) => {
+      setPrompt(entry.prompt);
+      setConfig(entry.config);
+      if(entry.uploadedImage) {
+        setUploadedImage(entry.uploadedImage);
+      } else {
+        setUploadedImage(null);
+      }
+      setIsHistoryOpen(false);
+  }
+
+  const handleDeleteHistory = async (id: string) => {
+      await dbService.deleteHistoryEntry(id);
+      setHistory(prev => prev.filter(entry => entry.id !== id));
+  }
   
-  const handleSyncComfyImages = async (options?: { closeModal?: boolean }) => {
-    setStatusMessage({ text: 'Fetching recent images from ComfyUI...', type: 'info' });
-    try {
-        const recentImages = await comfyuiService.fetchRecentImages(comfyUiServerAddress);
-        
-        const allDbHistory = await dbService.getAllHistory();
-        const existingFilenames = new Set(allDbHistory.map(entry => entry.comfyUiFilename).filter(Boolean));
-        
-        const newEntries = recentImages
-            .filter(img => !existingFilenames.has(img.filename))
-            // FIX: Explicitly type the new history entry to prevent TypeScript from incorrectly widening the `model` property to `string`.
-            .map((img): GenerationHistoryEntry => ({
-                id: crypto.randomUUID(),
-                imageDataUrl: img.imageDataUrl,
-                prompt: img.prompt,
-                config: { // Use current config as a template, but mark as comfy
-                    ...config,
-                    model: 'comfyui-local',
-                },
-                uploadedImage: null,
-                comfyUiWorkflow: img.workflowJson,
-                comfyUiFilename: img.filename,
-                timestamp: Date.now(),
-            }));
-
-        if (newEntries.length > 0) {
-            await dbService.addMultipleHistoryEntries(newEntries);
-            setHistory(currentHistory => [...newEntries, ...currentHistory].slice(0, MAX_HISTORY_SIZE));
-            setStatusMessage({ text: `Successfully synced ${newEntries.length} new image(s).`, type: 'success' });
-        } else {
-            setStatusMessage({ text: 'No new images to sync.', type: 'info' });
-        }
-        
-        if (options?.closeModal) {
-            setIsComfyEmbedOpen(false);
-        }
-    } catch (e) {
-        setStatusMessage({ text: e instanceof Error ? e.message : 'Failed to sync images.', type: 'error' });
+  const handleResetTags = () => {
+    if (window.confirm("Are you sure you want to reset all tags to their initial state? This cannot be undone.")) {
+        setManagedTags(initialManagedTags);
+        setStatusMessage({text: "Tag library has been reset to defaults.", type: 'info'});
     }
-  };
-  
-  const handleSelectCheckpointRequest = () => {
-    mainRef.current?.scrollIntoView({ behavior: 'smooth' });
-    // Maybe focus the select element later if we pass a ref
-  };
-
-  const handleOpenWorkflowPreview = (workflowJson: string) => {
-    setWorkflowToPreview(workflowJson);
-  };
-
-  const setSelectedComfyUiWorkflowId = (id: string) => {
-    setConfig(prev => ({...prev, selectedComfyUiWorkflowId: id}));
-  };
-  const setSelectedComfyUiCheckpoint = (checkpoint: string) => {
-    setConfig(prev => ({...prev, selectedComfyUiCheckpoint: checkpoint}));
-  };
-  
-  const handleCopyComplete = useCallback(() => {
-    setNodeToCopy(null);
-  }, []);
+  }
 
   return (
-    <div className="min-h-screen bg-transparent text-text-primary font-sans flex flex-col">
-      <div className="fixed inset-0 bg-bg-primary -z-10"></div>
-      <Header onOpenHistory={() => setIsHistoryOpen(true)} theme={theme} setTheme={setTheme} onOpenThemeEditor={() => setIsThemeEditorOpen(true)} customThemes={customThemes} onHeaderClick={handleHeaderClick} onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)} />
-      <main ref={mainRef} className="container mx-auto p-4 md:p-6 flex-grow">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <ImagePromptForm 
-            prompt={prompt}
-            setPrompt={setPrompt}
-            config={config}
-            setConfig={setConfig}
+    <div className="flex flex-col min-h-screen font-sans text-text-primary">
+        {visibleRatGifs.map(id => {
+            const gif = ratGifs.find(g => g.id === id);
+            if (!gif) return null;
+            
+            const classMap: Record<string, string> = {
+                'bottom-right-stack-1': 'fixed bottom-4 right-4 h-24 w-24 z-50 pointer-events-none rounded-full',
+                'bottom-right-stack-2': 'fixed bottom-4 right-20 h-24 w-24 z-50 pointer-events-none rounded-full',
+                'bottom-right-stack-3': 'fixed bottom-20 right-4 h-24 w-24 z-50 pointer-events-none rounded-full',
+                'bottom-right-stack-4': 'fixed bottom-20 right-20 h-24 w-24 z-50 pointer-events-none rounded-full',
+                'bottom-left-stack-1': 'fixed bottom-4 left-4 h-24 w-24 z-50 pointer-events-none rounded-full',
+                'bottom-left-stack-2': 'fixed bottom-4 left-20 h-24 w-24 z-50 pointer-events-none rounded-full',
+                'bottom-left-stack-3': 'fixed bottom-20 left-4 h-24 w-24 z-50 pointer-events-none rounded-full',
+                'bottom-left-stack-4': 'fixed bottom-20 left-20 h-24 w-24 z-50 pointer-events-none rounded-full',
+            };
+            
+            const finalClassName = gif.className || classMap[gif.position] || '';
+
+            return <img key={gif.id} src={gif.src} alt={gif.alt} className={finalClassName} />;
+        })}
+      <Header 
+        theme={theme} 
+        setTheme={setTheme} 
+        customThemes={customThemes}
+        onOpenThemeEditor={() => setIsThemeEditorOpen(true)}
+        onHeaderClick={handleHeaderClick}
+        onOpenHistory={() => setIsHistoryOpen(true)}
+        onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+      />
+      <main ref={mainRef} className="container mx-auto p-4 md:p-8 flex-grow space-y-8">
+        <div className="max-w-4xl mx-auto space-y-4">
+          {statusMessage && <StatusMessage message={statusMessage} />}
+          <ImagePromptForm
+            prompt={prompt} setPrompt={setPrompt}
+            config={config} setConfig={setConfig}
             onSubmit={handlePrimarySubmit}
             isLoading={isLoading}
             onOpenStyleManager={() => setIsStyleManagerOpen(true)}
             onOpenRecipeManager={() => setIsRecipeManagerOpen(true)}
             savedPresets={savedPresets}
             customStyles={customStyles}
-            onApplyPreset={handleApplyPreset}
+            onApplyPreset={(styles: string[]) => setConfig(prev => ({ ...prev, styles }))}
             uploadedImage={uploadedImage}
             setUploadedImage={setUploadedImage}
             onEnhancePrompt={handleEnhancePrompt}
             isEnhancing={isEnhancing}
             onSuggestNegativePrompt={handleSuggestNegativePrompt}
             isSuggestingNegative={isSuggestingNegative}
-            // FIX: Corrected typo from `handleCheckSafety` to `handleCheckPromptSafety`.
             onCheckSafety={handleCheckPromptSafety}
             isCheckingSafety={isCheckingSafety}
             safetyCheckResult={safetyCheckResult}
@@ -866,173 +791,153 @@ const App: React.FC = () => {
             setComfyUiServerAddress={setComfyUiServerAddress}
             onOpenComfyGuide={() => setIsComfyGuideOpen(true)}
             onOpenComfyUIEmbed={() => setIsComfyEmbedOpen(true)}
+            onSyncComfyImages={handleSyncComfyImages}
+            onQueueComfyInBackground={handleQueueComfyInBackground}
             comfyUiStatus={comfyUiStatus}
             onCheckComfyConnection={checkComfyConnection}
-            onSyncComfyImages={handleSyncComfyImages}
             comfyUiWorkflows={comfyUiWorkflows}
             selectedComfyUiWorkflowId={config.selectedComfyUiWorkflowId || ''}
-            setSelectedComfyUiWorkflowId={setSelectedComfyUiWorkflowId}
+            setSelectedComfyUiWorkflowId={(id) => setConfig(prev => ({ ...prev, selectedComfyUiWorkflowId: id }))}
             onOpenWorkflowManager={() => setIsWorkflowManagerOpen(true)}
             comfyUiCheckpoints={comfyUiCheckpoints}
             comfyUiLoras={comfyUiLoras}
             selectedComfyUiCheckpoint={config.selectedComfyUiCheckpoint || ''}
-            setSelectedComfyUiCheckpoint={setSelectedComfyUiCheckpoint}
+            setSelectedComfyUiCheckpoint={(val) => setConfig(prev => ({...prev, selectedComfyUiCheckpoint: val}))}
             managedTags={managedTags}
             onOpenTagManager={() => setIsTagManagerOpen(true)}
             onOpenNegativeGuide={() => setIsNegativeGuideOpen(true)}
             onOpenCheckpointManager={() => setIsCheckpointManagerOpen(true)}
             hiddenCheckpoints={hiddenCheckpoints}
-            onQueueComfyInBackground={handleQueueComfyInBackground}
           />
-          {statusMessage && <StatusMessage message={statusMessage} />}
-          <div className="mt-6">
-            <ImageDisplay 
-                images={history}
-                isLoading={isLoading}
-                config={config}
-                onSelectCheckpointRequest={handleSelectCheckpointRequest}
-                processingIndex={processingIndex}
-                sendingToComfyId={sendingToComfyId}
-                onDownload={handleDownloadImage}
-                onCopyImage={handleCopyImage}
-                onUseAsInput={handleUseAsInput}
-                onSendToComfyCanvas={handleSendToComfyCanvas}
-                onEnhance={handleEnhanceImage}
-                onFixFace={handleFixFace}
-                onUpscale={handleUpscaleImage}
-                onRemoveWatermark={handleRemoveWatermark}
-                onMagicEdit={handleOpenMagicEdit}
-                onShare={handleShare}
-                onDelete={handleDeleteFromHistory}
-                onViewWorkflow={handleOpenWorkflowPreview}
-                onRemix={handleLoadFromHistory}
-             />
-          </div>
+        </div>
+        <div className="max-w-7xl mx-auto">
+          <ImageDisplay
+            images={history}
+            isLoading={isLoading}
+            config={config}
+            onSelectCheckpointRequest={() => mainRef.current?.querySelector<HTMLElement>('#comfy-checkpoint')?.focus()}
+            processingIndex={processingIndex}
+            sendingToComfyId={sendingToComfyId}
+            onDownload={handleDownloadImage}
+            onCopyImage={handleCopyImage}
+            onUseAsInput={(data) => setUploadedImage({ data, mimeType: 'image/png' })}
+            onSendToComfyCanvas={handleSendToComfyCanvas}
+            onEnhance={handleEnhanceImage}
+            onFixFace={handleFixFace}
+            onUpscale={handleUpscale}
+            onRemoveWatermark={handleRemoveWatermark}
+            onMagicEdit={(id, data) => setMagicEditState({ isOpen: true, imageId: id, imageData: data, isLoading: false })}
+            onShare={handleShareRecipe}
+            onDelete={handleDeleteHistory}
+            onViewWorkflow={(json) => setWorkflowToPreview(json)}
+            onRemix={handleLoadHistory}
+          />
         </div>
       </main>
       <Footer />
-      {(() => {
-        const rightStackedGifs = ratGifs
-            .filter(gif => visibleRatGifs.includes(gif.id) && gif.position.startsWith('bottom-right-stack'))
-            .sort((a, b) => a.position.localeCompare(b.position));
-        
-        const leftStackedGifs = ratGifs
-            .filter(gif => visibleRatGifs.includes(gif.id) && gif.position.startsWith('bottom-left-stack'))
-            .sort((a, b) => a.position.localeCompare(b.position));
 
-        const floatingGifs = ratGifs
-            .filter(gif => visibleRatGifs.includes(gif.id) && !gif.position.startsWith('bottom-right-stack') && !gif.position.startsWith('bottom-left-stack'));
-        
-        return (
-          <>
-            {rightStackedGifs.length > 0 && (
-              <div className="fixed bottom-4 right-4 z-50 pointer-events-none flex flex-col-reverse gap-2">
-                {rightStackedGifs.map(gif => (
-                  <div
-                      key={gif.id}
-                      className="w-48 h-48 rounded-md shadow-lg bg-cover bg-center border-2 border-accent"
-                      style={{ backgroundImage: `url(${gif.src})` }}
-                      role="img"
-                      aria-label={gif.alt}
-                  />
-                ))}
-              </div>
-            )}
-            {leftStackedGifs.length > 0 && (
-              <div className="fixed bottom-4 left-4 z-50 pointer-events-none flex flex-col-reverse gap-2">
-                {leftStackedGifs.map(gif => (
-                  <div
-                      key={gif.id}
-                      className="w-48 h-48 rounded-md shadow-lg bg-cover bg-center border-2 border-accent"
-                      style={{ backgroundImage: `url(${gif.src})` }}
-                      role="img"
-                      aria-label={gif.alt}
-                  />
-                ))}
-              </div>
-            )}
-            {floatingGifs.map(gif => (
-                <img key={gif.id} src={gif.src} alt={gif.alt} className={gif.className} />
-            ))}
-          </>
-        );
-      })()}
-      
-      <ApiKeyModal
+      {/* --- Modals --- */}
+      <ApiKeyModal 
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}
         apiKey={userApiKey}
-        onSaveApiKey={setUserApiKey}
+        onSaveApiKey={(key) => setUserApiKey(key)}
+      />
+      <StyleManager
+        isOpen={isStyleManagerOpen}
+        onClose={() => setIsStyleManagerOpen(false)}
+        savedPresets={savedPresets}
+        customStyles={customStyles}
+        currentStyles={config.styles}
+        onSavePreset={(name) => setSavedPresets(prev => [...prev, { id: crypto.randomUUID(), name, styles: config.styles }])}
+        onDeletePreset={(id) => setSavedPresets(prev => prev.filter(p => p.id !== id))}
+        onSaveCustomStyle={(name, prompt) => setCustomStyles(prev => [...prev, { id: crypto.randomUUID(), name, prompt }])}
+        onDeleteCustomStyle={(id) => setCustomStyles(prev => prev.filter(cs => cs.id !== id))}
+        onApplyPreset={(styles) => { setConfig(prev => ({ ...prev, styles })); setIsStyleManagerOpen(false); }}
       />
       <RecipeManagerModal
         isOpen={isRecipeManagerOpen}
         onClose={() => setIsRecipeManagerOpen(false)}
         recipes={recipes}
         onSave={handleSaveRecipe}
-        onDelete={handleDeleteRecipe}
+        onDelete={(id) => setRecipes(prev => prev.filter(r => r.id !== id))}
         onLoad={handleLoadRecipe}
-        onSetDefault={handleSetDefaultRecipe}
+        onSetDefault={setDefaultRecipeId}
         defaultRecipeId={defaultRecipeId}
         currentPrompt={prompt}
-      />
-      <StyleManager 
-        isOpen={isStyleManagerOpen} 
-        onClose={() => setIsStyleManagerOpen(false)}
-        savedPresets={savedPresets}
-        customStyles={customStyles}
-        currentStyles={config.styles}
-        onSavePreset={handleSavePreset}
-        onDeletePreset={handleDeletePreset}
-        onSaveCustomStyle={handleSaveCustomStyle}
-        onDeleteCustomStyle={handleDeleteCustomStyle}
-        onApplyPreset={handleApplyPreset}
-      />
-      <MagicEditModal 
+       />
+      <MagicEditModal
         isOpen={magicEditState.isOpen}
         isLoading={magicEditState.isLoading}
         imageData={magicEditState.imageData}
         onClose={() => setMagicEditState({ isOpen: false, imageId: null, imageData: null, isLoading: false })}
-        onSubmit={handleMagicEditSubmit}
+        onSubmit={handleMagicEdit}
       />
-      <ThemeEditor 
-        isOpen={isThemeEditorOpen}
-        onClose={() => {
-            setIsThemeEditorOpen(false);
-            setPreviewTheme(null);
-        }}
-        customThemes={customThemes}
-        onSaveTheme={handleSaveCustomTheme}
-        onDeleteTheme={handleDeleteCustomTheme}
-        onSelectTheme={setTheme}
-        activeThemeId={theme}
-        onPreviewTheme={setPreviewTheme}
+       <ThemeEditor
+          isOpen={isThemeEditorOpen}
+          onClose={() => { setIsThemeEditorOpen(false); setPreviewTheme(null); }}
+          customThemes={customThemes}
+          onSaveTheme={(theme) => {
+              setCustomThemes(prev => {
+                  const existing = prev.find(t => t.id === theme.id);
+                  if (existing) {
+                      return prev.map(t => t.id === theme.id ? theme : t);
+                  }
+                  return [...prev, theme];
+              });
+              setTheme(theme.id);
+          }}
+          onDeleteTheme={(id) => {
+              if (theme === id) setTheme('dark');
+              setCustomThemes(prev => prev.filter(t => t.id !== id));
+          }}
+          onSelectTheme={setTheme}
+          activeThemeId={theme}
+          onPreviewTheme={setPreviewTheme}
       />
       <ComfyUIGuideModal isOpen={isComfyGuideOpen} onClose={() => setIsComfyGuideOpen(false)} />
       <ComfyUIWorkflowManager 
-        isOpen={isWorkflowManagerOpen} 
+        isOpen={isWorkflowManagerOpen}
         onClose={() => setIsWorkflowManagerOpen(false)}
         workflows={comfyUiWorkflows}
-        onSave={handleSaveWorkflow}
-        onDelete={handleDeleteWorkflow}
+        onSave={(wf) => {
+            setComfyUiWorkflows(prev => {
+                const existing = prev.find(w => w.id === wf.id);
+                if (existing) {
+                    return prev.map(w => w.id === wf.id ? wf : w);
+                }
+                return [...prev, wf];
+            });
+        }}
+        onDelete={(id) => {
+            if(config.selectedComfyUiWorkflowId === id) {
+              setConfig(prev => ({...prev, selectedComfyUiWorkflowId: 'default-t2i-simple'}));
+            }
+            setComfyUiWorkflows(prev => prev.filter(w => w.id !== id))
+        }}
       />
       <ComfyUIEmbedModal 
         isOpen={isComfyEmbedOpen}
-        onClose={() => {
-            setIsComfyEmbedOpen(false);
-            setNodeToCopy(null);
-        }}
+        onClose={() => setIsComfyEmbedOpen(false)}
         serverAddress={comfyUiServerAddress}
         onSyncImages={handleSyncComfyImages}
         nodeToCopy={nodeToCopy}
-        onCopyComplete={handleCopyComplete}
+        onCopyComplete={() => setNodeToCopy(null)}
       />
-      <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} onLoad={handleLoadFromHistory} onDelete={handleDeleteFromHistory} onShare={handleShare} />
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
+        onLoad={handleLoadHistory}
+        onDelete={handleDeleteHistory}
+        onShare={handleShareRecipe}
+       />
       <TagManagerModal
         isOpen={isTagManagerOpen}
         onClose={() => setIsTagManagerOpen(false)}
         tags={managedTags}
         onUpdateTags={setManagedTags}
-        onResetToDefaults={() => setManagedTags(initialManagedTags)}
+        onResetToDefaults={handleResetTags}
       />
       <NegativePromptGuideModal isOpen={isNegativeGuideOpen} onClose={() => setIsNegativeGuideOpen(false)} />
       <CheckpointManagerModal
@@ -1042,8 +947,13 @@ const App: React.FC = () => {
         hiddenCheckpoints={hiddenCheckpoints}
         onUpdateHiddenCheckpoints={setHiddenCheckpoints}
       />
-      <WorkflowPreviewModal isOpen={!!workflowToPreview} onClose={() => setWorkflowToPreview(null)} workflowJson={workflowToPreview} />
+      <WorkflowPreviewModal 
+        isOpen={!!workflowToPreview}
+        onClose={() => setWorkflowToPreview(null)}
+        workflowJson={workflowToPreview}
+      />
     </div>
   );
 };
+
 export default App;
