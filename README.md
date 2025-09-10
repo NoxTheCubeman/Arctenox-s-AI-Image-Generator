@@ -19,6 +19,10 @@ This application connects to the Google Gemini API using an API key. There are t
 ## How to run it in Vercel
 
 1. Paste this into your URL: https://arctenox-s-image-generator.vercel.app
+2. Top right click Manage API Key, and enter the API key and click save
+3. Your ready to go once you've done these two things.
+
+Note: Imagen 4.0 might not work due to your billing on your Google Gemini API Key, it's not a app/bug issue.
 
 ## Running Locally
 
