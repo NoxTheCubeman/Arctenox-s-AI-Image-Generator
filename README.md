@@ -66,6 +66,8 @@ Additionally, due to bug issues you cannot open or close this ComfyUI Embed, I t
 
 <img width="873" height="679" alt="image" src="https://github.com/user-attachments/assets/7906628d-cb58-4489-af4d-d3bb4ba94e4a" />
 
+You can however change it's size on the Y-Axis (Up-and-Down).
+
 ## Developer Notes
 
 This will eventually be deployed to static hosting service like Netlify. I will also add Gemini 2.5 Pro and other paid google img gen models at a later date into this. Also there's a fun little easter egg in the app have fun looking for it, shouldn't be too hard.
