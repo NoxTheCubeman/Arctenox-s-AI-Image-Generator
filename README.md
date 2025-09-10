@@ -14,7 +14,11 @@ This application connects to the Google Gemini API using an API key. There are t
 1.  **Application Default Key (Recommended for Local):** A pre-configured API key can be provided as an environment variable (`VITE_API_KEY`) during the build process. This is ideal for deploying the application to a static hosting service where the key is kept secure on the server.
 2.  **User-Provided Key in Vercel (Optional):** Users can optionally provide their own Gemini API key via the "Manage API Key" button in the application header. This key is stored securely in the browser's local storage and is never sent to any server other than Google's.
 
-**Key Precedence:** If a user provides their own key, it will be used for all API requests. If the user-provided key is removed, the application will fall back to using the default key if it has been configured.
+**Key Precedence:** If a user provides their own key, it will be used for all API requests. If the user-provided key is removed, the application will fall back to using nothing.
+
+## How to run it in Vercel
+
+1. Paste this into your URL: https://arctenox-s-image-generator.vercel.app
 
 ## Running Locally
 
