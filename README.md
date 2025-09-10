@@ -70,4 +70,4 @@ You can however change it's size on the Y-Axis (Up-and-Down).
 
 ## Developer Notes
 
-This will eventually be deployed to static hosting service like Netlify. I will also add Gemini 2.5 Pro and other paid google img gen models at a later date into this. Also there's a fun little easter egg in the app have fun looking for it, shouldn't be too hard.
+This will eventually be deployed to static hosting service like Netlify. I will also add Gemini 2.5 Pro and other paid google img gen models at a later date into this. Also there's a fun little easter egg in the app have fun looking for it, shouldn't be too hard, the Easter Eggs are more aligned better if your zoomed out by %80.
