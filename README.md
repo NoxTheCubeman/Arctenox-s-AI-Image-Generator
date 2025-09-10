@@ -42,6 +42,13 @@ Note: Imagen 4.0 might not work due to your billing on your Google Gemini API Ke
     `npm run dev`
     
     The Vite development server will automatically load the `VITE_API_KEY` from your `.env.local` file.
+    
+## How to run ComfyUI (Local)
+1. You should not be clicking run ComfyUI in the ComfyUI Embed but yoou should be clicking these to run ComfyUI with the style emulators or to bring the images to the app: <img width="344" height="38" alt="image" src="https://github.com/user-attachments/assets/16022bb6-50fb-40de-af5f-1552f8f5cd65" />
+
+2. To use a workflow to use in the background you should be going here: <img width="438" height="190" alt="image" src="https://github.com/user-attachments/assets/783bfa83-ed5c-4693-a5e7-c76ad3db271d" />
+
+3. To add a workflow click manage and it will bring up a panel that should look like:" <img width="896" height="831" alt="image" src="https://github.com/user-attachments/assets/46ecb01c-5568-4248-b36e-10b4dd7d5422" />
 
 ## Developer Notes
 
