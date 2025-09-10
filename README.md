@@ -43,6 +43,6 @@ Note: Imagen 4.0 might not work due to your billing on your Google Gemini API Ke
     
     The Vite development server will automatically load the `VITE_API_KEY` from your `.env.local` file.
 
-## Deploying
+## Develoepr Notes
 
 This will eventually be deployed to static hosting service like Netlify. I will also add Gemini 2.5 Pro and other paid google img gen models at a later date into this.
