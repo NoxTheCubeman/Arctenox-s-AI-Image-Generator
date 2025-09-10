@@ -37,4 +37,4 @@ This application connects to the Google Gemini API using an API key. There are t
 
 ## Deploying
 
-You can deploy this project to any static hosting service like Vercel, Netlify, or GitHub Pages. During the build process, you must provide the `VITE_API_KEY` as an environment variable in your hosting provider's settings.
+This will eventually be deployed to static hosting service like Netlify. During the build process, you must provide the `VITE_API_KEY` as an environment variable in your hosting provider's settings.
