@@ -62,6 +62,10 @@ To change the theme of the app both Local and on Vercel/Statc Hosts you can clic
 
 Everything else should be self explainatory if you click manage on any of the areas, it should add a panel like with the one above the select checkpoint which allows you to hide selectable models so you only see the ones you want to see in the app.
 
+Additionally, due to bug issues you cannot open or close this ComfyUI Embed, I tried to vibe code that feature in and it did not like it, the full embed you can open/close, this is the embed im talking about:
+
+<img width="873" height="679" alt="image" src="https://github.com/user-attachments/assets/7906628d-cb58-4489-af4d-d3bb4ba94e4a" />
+
 ## Developer Notes
 
 This will eventually be deployed to static hosting service like Netlify. I will also add Gemini 2.5 Pro and other paid google img gen models at a later date into this. Also there's a fun little easter egg in the app have fun looking for it, shouldn't be too hard.
