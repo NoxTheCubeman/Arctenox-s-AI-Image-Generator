@@ -42,7 +42,11 @@ Note: Imagen 4.0 might not work due to your billing on your Google Gemini API Ke
     `npm run dev`
     
     The Vite development server will automatically load the `VITE_API_KEY` from your `.env.local` file.
-    
+
+To change the theme of the app both Local and on Vercel/Statc Hosts you can click these things on the top right and it should save to your session, the theme you have selected and the theme you made additionally you can import and export custom themes in the manage themes:
+
+<img width="283" height="395" alt="image" src="https://github.com/user-attachments/assets/c8d6b8ab-2ac6-4873-9b51-420d22516b5c" />
+
 ## How to run ComfyUI (Local)
 1. You should not be clicking run ComfyUI in the ComfyUI Embed but yoou should be clicking these to run ComfyUI with the style emulators or to bring the images to the app:
   
