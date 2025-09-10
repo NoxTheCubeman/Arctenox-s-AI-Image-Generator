@@ -56,9 +56,7 @@ Note: Imagen 4.0 might not work due to your billing on your Google Gemini API Ke
   
 <img width="877" height="822" alt="image" src="https://github.com/user-attachments/assets/dce72841-5f5f-49ee-9f0c-5b06cac12718" />
 
-Everything else should be self explainatory if you click manage on any of the areas, it should add a panel like with the one above the select checkpoint which allows you to hide selectable models so you only see the ones you want to see in the app:
-
-<img width="885" height="826" alt="image" src="https://github.com/user-attachments/assets/7b35772f-9aca-4b21-ad65-bc916725ad78" />
+Everything else should be self explainatory if you click manage on any of the areas, it should add a panel like with the one above the select checkpoint which allows you to hide selectable models so you only see the ones you want to see in the app.
 
 ## Developer Notes
 
