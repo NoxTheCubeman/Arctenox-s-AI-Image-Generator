@@ -5,6 +5,7 @@
 ## Prerequisites
 
 - Node.js
+- Google Gemini API Key
 
 ## How It Works
 
