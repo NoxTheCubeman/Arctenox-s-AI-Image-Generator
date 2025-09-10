@@ -6,8 +6,9 @@
 
 - Node.js
 - Google Gemini API
-Get your Google Gemini API Key here at the official site: https://aistudio.google.com/apikey
+
 Download Node.js here at the official site: https://nodejs.org/en/download
+Get your Google Gemini API Key here at the official site: https://aistudio.google.com/apikey
 
 ## How It Works
 
