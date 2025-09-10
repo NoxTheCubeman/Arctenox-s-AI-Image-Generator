@@ -45,4 +45,4 @@ Note: Imagen 4.0 might not work due to your billing on your Google Gemini API Ke
 
 ## Deploying
 
-This will eventually be deployed to static hosting service like Netlify. I will also add Gemini 2.5 Pro at a later date into here.
+This will eventually be deployed to static hosting service like Netlify. I will also add Gemini 2.5 Pro and other paid google img gen models at a later date into this.
