@@ -35,7 +35,7 @@ Note: Imagen 4.0 might not work due to your billing on your Google Gemini API Ke
 2.  **Create an environment file:**
     Create a file named `.env.local` in the root of the project and add your API key:
     ```
-    VITE_API_KEY="YOUR_GEMINI_API_KEY_HERE"
+    GEMINI_API_KEY=PLACEHOLDER_API_KEY"
     ```
     *This file is ignored by Git, so your key will not be committed.*
 3.  **Run the development server:**
