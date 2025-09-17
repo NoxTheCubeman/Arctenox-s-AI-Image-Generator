@@ -22,7 +22,7 @@ This application connects to the Google Gemini API using an API key. There are t
 2.  **Create an environment file:**
     Create a file named `.env.local` in the root of the project and add your API key:
     ```
-    VITE_API_KEY="YOUR_GEMINI_API_KEY_HERE"
+    GEMINI_API_KEY="YOUR_GEMINI_API_KEY_HERE"
     ```
     *This file is ignored by Git, so your key will not be committed.*
 3.  **Run the development server:**
