@@ -1,6 +1,6 @@
 import React from 'react';
 import ThemeSwitcher from './ThemeSwitcher';
-import { CustomTheme } from '../types';
+import { CustomTheme, AppTab } from '../types';
 
 interface HeaderProps {
   theme: string;
@@ -10,12 +10,38 @@ interface HeaderProps {
   onHeaderClick: () => void;
   onOpenHistory: () => void;
   onOpenApiKeyModal: () => void;
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ theme, setTheme, onOpenThemeEditor, customThemes, onHeaderClick, onOpenHistory, onOpenApiKeyModal }) => {
+const TabButton: React.FC<{
+    name: string;
+    tabId: AppTab;
+    activeTab: AppTab;
+    onTabChange: (tab: AppTab) => void;
+}> = ({ name, tabId, activeTab, onTabChange }) => {
+    const isActive = activeTab === tabId;
+    return (
+        <button
+            onClick={() => onTabChange(tabId)}
+            className={`px-6 py-3 text-sm font-semibold transition-colors focus:outline-none ${
+                isActive
+                    ? 'border-b-2 border-accent text-text-primary'
+                    : 'border-b-2 border-transparent text-text-secondary hover:border-accent/50 hover:text-text-primary'
+            }`}
+            role="tab"
+            aria-selected={isActive}
+        >
+            {name}
+        </button>
+    );
+};
+
+
+const Header: React.FC<HeaderProps> = ({ theme, setTheme, onOpenThemeEditor, customThemes, onHeaderClick, onOpenHistory, onOpenApiKeyModal, activeTab, setActiveTab }) => {
   return (
-    <header className="bg-bg-secondary/50 backdrop-blur-sm p-4 sticky top-0 z-10 shadow-lg animate-fade-in">
-      <div className="container mx-auto grid grid-cols-3 items-center">
+    <header className="bg-bg-secondary/50 backdrop-blur-sm sticky top-0 z-10 shadow-lg animate-fade-in">
+      <div className="container mx-auto grid grid-cols-3 items-center p-4">
         {/* Left-aligned content */}
         <div className="flex justify-start items-center gap-4">
            <button
@@ -56,6 +82,12 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onOpenThemeEditor, cus
             </button>
             <ThemeSwitcher theme={theme} setTheme={setTheme} customThemes={customThemes} />
         </div>
+      </div>
+      
+      {/* Tab Navigation */}
+      <div className="container mx-auto flex justify-center border-b border-border-primary/50">
+          <TabButton name="Generate" tabId="generate" activeTab={activeTab} onTabChange={setActiveTab} />
+          <TabButton name="Merge" tabId="merge" activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
     </header>
   );

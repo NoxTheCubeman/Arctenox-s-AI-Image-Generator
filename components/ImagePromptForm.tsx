@@ -1,9 +1,5 @@
 
 
-
-
-
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { ImageConfig, AspectRatio, ArtisticStyle, ImageModel, SavedStylePreset, CustomStylePreset, SafetyCheckResult, ComfyUIWorkflowPreset, TagCategories, SeedControl, LoRA } from '../types';
 import { randomPrompts } from '../lib/prompts';
@@ -72,6 +68,7 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "arc-rococo", label: "Arc-Rococo" },
   { value: "arctenox-style", label: "Arctenox's Style" },
   { value: "art-deco", label: "Art Deco" },
+  { value: "art-deco-futurism", label: "Art Deco Futurism" },
   { value: "art-nouveau", label: "Art Nouveau" },
   { value: "baroque", label: "Baroque" },
   { value: "blue-lock", label: "Blue Lock Anime" },
@@ -85,8 +82,12 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "civitai-epic-realism", label: "Civitai Epic Realism" },
   { value: "civitai-semi-realistic", label: "Civitai Semi-Realistic" },
   { value: "claymation", label: "Claymation" },
+  { value: "colored-pencil", label: "Colored Pencil" },
+  { value: "colored-sketch", label: "Colored Sketch" },
+  { value: "colored-line-art", label: "Line Art (Colored)" },
   { value: "comic-book", label: "Comic Book" },
   { value: "concept-art", label: "Concept Art" },
+  { value: "crystalline-frost", label: "Crystalline Frost" },
   { value: "cyber-gothic", label: "Cyber Gothic" },
   { value: "cyberpunk", label: "Cyberpunk" },
   { value: "dandadan-manga", label: "Dandadan Manga" },
@@ -104,11 +105,13 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "ghibli-esque", label: "Ghibli-esque" },
   { value: "glassmorphism", label: "Glassmorphism" },
   { value: "glossy-airbrushed-anime", label: "Glossy Airbrushed Anime" },
+  { value: "golden-hour-photography", label: "Golden Hour Photography" },
   { value: "gothic-anime", label: "Gothic Anime" },
   { value: "gothic", label: "Gothic Horror" },
   { value: "gouache", label: "Gouache Painting" },
   { value: "gritty", label: "Gritty" },
   { value: "high-contrast-manga", label: "High-Contrast Manga" },
+  { value: "high-resolution-pixel-art", label: "High Resolution Pixel Art" },
   { value: "hologram-glitch", label: "Hologram / Glitch" },
   { value: "hyper-realism", label: "Hyper Realism" },
   { value: "hyphoria-illu", label: "Hyphoria Illu Style" },
@@ -119,6 +122,7 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "isometric", label: "Isometric" },
   { value: "jujutsu-kaisen", label: "Jujutsu Kaisen Anime" },
   { value: "kegant-style", label: "Kegant Style" },
+  { value: "kyoto-animation-style", label: "Kyoto Animation Style" },
   { value: "line-art", label: "Line Art" },
   { value: "lo-fi", label: "Lo-fi Aesthetic" },
   { value: "low-poly", label: "Low Poly" },
@@ -130,6 +134,7 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "novelai-anime-v3", label: "NovelAI Anime V3" },
   { value: "novelai-furry-diffusion", label: "NovelAI Furry Diffusion" },
   { value: "oshi-no-ko", label: "Oshi no Ko Anime" },
+  { value: "painterly", label: "Painterly" },
   { value: "papercraft", label: "Papercraft / Cutout" },
   { value: "photorealistic", label: "Photorealistic" },
   { value: "pixel-art", label: "Pixel Art" },
@@ -143,6 +148,7 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "redactedpaws-style", label: "RedactedPaws' Style" },
   { value: "rendered-digital-art", label: "Rendered Digital Art" },
   { value: "retro-anime-90s", label: "Retro Anime (90s)" },
+  { value: "riso-print", label: "Riso Print" },
   { value: "rpaws-anthro", label: "Anthro / Furry" },
   { value: "seaart-ancient-style", label: "SeaArt Ancient Style" },
   { value: "seaart-exquisite-detail", label: "SeaArt Exquisite Detail" },
@@ -151,9 +157,14 @@ const artisticStyles: { value: ArtisticStyle; label: string }[] = [
   { value: "sketch", label: "Sketch" },
   { value: "solo-leveling", label: "Solo Leveling Anime/Manhwa" },
   { value: "splatter-art", label: "Splatter Art" },
+  { value: "stained-glass-window", label: "Stained Glass Window" },
   { value: "steampunk", label: "Steampunk" },
   { value: "sticker-style", label: "Sticker Style" },
+  { value: "tactical-anime", label: "Tactical Anime" },
+  { value: "tarot-card", label: "Tarot Card" },
   { value: "tribal-art", label: "Tribal Art" },
+  { value: "trigger-studio-style", label: "Trigger Studio Style" },
+  { value: "ufotable-style", label: "Ufotable Style" },
   { value: "ukiyo-e", label: "Ukiyo-e" },
   { value: "valentine-designs", label: "Valentinedesigns' Style" },
   { value: "vaporwave", label: "Vaporwave" },
@@ -168,6 +179,15 @@ const imageModels: { value: ImageModel; label: string }[] = [
     { value: "imagen-4.0-generate-001", label: "Imagen 4.0" },
     { value: "comfyui-local", label: "ComfyUI (Local)" },
 ];
+
+const comfySamplers = [
+  'dpmpp_2s_ancestral', 'dpmpp_sde', 'dpmpp_2m', 'dpmpp_2m_sde', 'ddim', 
+  'euler', 'euler_ancestral', 'heun', 'lms', 'uni_pc', 'uni_pc_bh2'
+].sort();
+
+const comfySchedulers = [
+  'normal', 'karras', 'exponential', 'sgm_uniform', 'simple', 'ddim_uniform'
+].sort();
 
 // FIX: Define a discriminated union for model capabilities to help TypeScript narrow types.
 type NoBatchCapability = { maxImages: number; aspectRatio: boolean; img2img: boolean; batch: false; };
@@ -793,7 +813,7 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                                     </select>
                                 </div>
                            </div>
-                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-border-primary/50">
+                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 gap-y-6 pt-4 border-t border-border-primary/50">
                                 <div>
                                     <label htmlFor="width" className="block text-sm font-medium text-text-secondary mb-1">Width</label>
                                     <input
@@ -838,6 +858,44 @@ const ImagePromptForm: React.FC<ImagePromptFormProps> = ({
                                         className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text focus:ring-2 focus:ring-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         disabled={isLoading}
                                     />
+                                </div>
+                                <div>
+                                    <label htmlFor="steps" className="block text-sm font-medium text-text-secondary mb-1">Steps</label>
+                                    <input
+                                        id="steps"
+                                        type="number"
+                                        min="1"
+                                        max="100"
+                                        step="1"
+                                        value={config.comfyUiSteps}
+                                        onChange={(e) => setConfig(prev => ({ ...prev, comfyUiSteps: parseInt(e.target.value, 10) || 20 }))}
+                                        className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text placeholder-input-placeholder/60 focus:ring-2 focus:ring-accent"
+                                        disabled={isLoading}
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="sampler" className="block text-sm font-medium text-text-secondary mb-1">Sampler</label>
+                                    <select
+                                        id="sampler"
+                                        value={config.comfyUiSamplerName}
+                                        onChange={(e) => setConfig(prev => ({ ...prev, comfyUiSamplerName: e.target.value }))}
+                                        className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text focus:ring-2 focus:ring-accent"
+                                        disabled={isLoading}
+                                    >
+                                        {comfySamplers.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label htmlFor="scheduler" className="block text-sm font-medium text-text-secondary mb-1">Scheduler</label>
+                                    <select
+                                        id="scheduler"
+                                        value={config.comfyUiScheduler}
+                                        onChange={(e) => setConfig(prev => ({ ...prev, comfyUiScheduler: e.target.value }))}
+                                        className="w-full p-2 bg-input-bg border border-input-border rounded-lg text-input-text focus:ring-2 focus:ring-accent"
+                                        disabled={isLoading}
+                                    >
+                                        {comfySchedulers.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
                                 </div>
                             </div>
                             

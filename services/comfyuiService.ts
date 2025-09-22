@@ -570,7 +570,10 @@ export const queuePromptInBackground = async (
     height: number,
     seed: number,
     loras: LoRA[],
-    cfg: number
+    cfg: number,
+    steps: number,
+    samplerName: string,
+    scheduler: string
 ): Promise<void> => {
     try {
         const workflow = JSON.parse(workflowApi);
@@ -624,21 +627,43 @@ export const queuePromptInBackground = async (
         
         // --- Update basic generation parameters ---
         let seedUpdated = false;
+        let stepsUpdated = false;
         let cfgUpdated = false;
+        let samplerUpdated = false;
+        let schedulerUpdated = false;
+
         for (const id in workflow) {
             const node = workflow[id];
-            if (node.inputs && 'seed' in node.inputs) {
-                node.inputs.seed = seed;
-                seedUpdated = true;
-            }
-             if (node.inputs && 'cfg' in node.inputs) {
-                node.inputs.cfg = cfg;
-                cfgUpdated = true;
+            if (node.inputs) {
+                if ('seed' in node.inputs) {
+                    node.inputs.seed = seed;
+                    seedUpdated = true;
+                }
+                if ('steps' in node.inputs) {
+                    node.inputs.steps = steps;
+                    stepsUpdated = true;
+                }
+                if ('cfg' in node.inputs) {
+                    node.inputs.cfg = cfg;
+                    cfgUpdated = true;
+                }
+                if ('sampler_name' in node.inputs) {
+                    node.inputs.sampler_name = samplerName;
+                    samplerUpdated = true;
+                }
+                if ('scheduler' in node.inputs) {
+                    node.inputs.scheduler = scheduler;
+                    schedulerUpdated = true;
+                }
             }
         }
 
-        if (!seedUpdated) console.warn("Could not find a 'seed' input in any node.");
-        if (!cfgUpdated) console.warn("Could not find a 'cfg' input in any node.");
+        // More specific warnings for debugging user workflows
+        if (!seedUpdated) console.warn("Could not find a 'seed' input in any KSampler-like node.");
+        if (!stepsUpdated) console.warn("Could not find a 'steps' input in any KSampler-like node.");
+        if (!cfgUpdated) console.warn("Could not find a 'cfg' input in any KSampler-like node.");
+        if (!samplerUpdated) console.warn("Could not find a 'sampler_name' input in any KSampler-like node.");
+        if (!schedulerUpdated) console.warn("Could not find a 'scheduler' input in any KSampler-like node.");
 
         if (checkpoint) workflow[checkpointNodeId].inputs.ckpt_name = checkpoint;
 

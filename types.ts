@@ -1,5 +1,6 @@
 export type AspectRatio = "1:1" | "16:9" | "9:16" | "4:3" | "3:4";
 export type SeedControl = 'fixed' | 'increment' | 'decrement' | 'randomize';
+export type AppTab = 'generate' | 'merge';
 
 // FIX: Added 'novelai-style' to the type union to resolve type errors.
 export type ArtisticStyle =
@@ -7,11 +8,16 @@ export type ArtisticStyle =
   // New Styles
   | "novelai-anime-v3" | "novelai-furry-diffusion" | "civitai-epic-realism" | "civitai-concept-masterpiece" | "civitai-semi-realistic" | "seaart-exquisite-detail" | "seaart-ancient-style" | "seaart-mecha-warrior" | "pixai-moonbeam" | "pixai-realism"
   // Styles from user images
-  | "high-contrast-manga" | "volcanic-soul" | "gothic-anime" | "polished-furry" | "webtoon-style" | "ethereal-anime-painting" | "rendered-digital-art" | "cel-shaded-illustration"
+  | "high-contrast-manga" | "volcanic-soul" | "gothic-anime" | "polished-furry" | "webtoon-style" | "ethereal-anime-painting" | "rendered-digital-art" | "cel-shaded-illustration" | "crystalline-frost" | "tactical-anime"
   // Styles from new images
   | "vibrant-abstract-painting" | "glossy-airbrushed-anime"
   // New anime styles
-  | "bocchi-the-rock" | "chainsaw-man" | "dandadan-manga" | "frieren-anime" | "gachiakuta-manga" | "jujutsu-kaisen" | "oshi-no-ko" | "solo-leveling" | "blue-lock";
+  | "bocchi-the-rock" | "chainsaw-man" | "dandadan-manga" | "frieren-anime" | "gachiakuta-manga" | "jujutsu-kaisen" | "oshi-no-ko" | "solo-leveling" | "blue-lock"
+  | "high-resolution-pixel-art"
+  // More unique styles
+  | "stained-glass-window" | "tarot-card" | "riso-print" | "art-deco-futurism" | "golden-hour-photography" | "trigger-studio-style" | "ufotable-style" | "kyoto-animation-style"
+  // New styles from user
+  | "colored-line-art" | "painterly" | "colored-pencil" | "colored-sketch";
 
 export type ImageModel = "gemini-2.5-flash-image-preview" | "imagen-4.0-generate-001" | "comfyui-local";
 
@@ -41,6 +47,9 @@ export interface ImageConfig {
   comfyUiSeed: number;
   comfyUiSeedControl: SeedControl;
   loras: LoRA[];
+  comfyUiSteps: number;
+  comfyUiSamplerName: string;
+  comfyUiScheduler: string;
 }
 
 export interface GenerationHistoryEntry {

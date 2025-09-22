@@ -5,7 +5,7 @@
 
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import type { ImageConfig, SavedStylePreset, CustomStylePreset, SafetyCheckResult, CustomTheme, StatusMessage as StatusMessageProps, ComfyUIWorkflowPreset, GenerationHistoryEntry, TagCategories, GenerationRecipe } from '../types';
+import type { ImageConfig, SavedStylePreset, CustomStylePreset, SafetyCheckResult, CustomTheme, StatusMessage as StatusMessageProps, ComfyUIWorkflowPreset, GenerationHistoryEntry, TagCategories, GenerationRecipe, AppTab } from '../types';
 import * as geminiService from '../services/geminiService';
 import * as comfyuiService from '../services/comfyuiService';
 import * as dbService from '../services/dbService';
@@ -121,6 +121,9 @@ const App: React.FC = () => {
     comfyUiSeed: Math.floor(Math.random() * 1e15),
     comfyUiSeedControl: 'fixed',
     loras: [{ id: crypto.randomUUID(), name: '', strength: 1.0 }],
+    comfyUiSteps: 20,
+    comfyUiSamplerName: 'euler',
+    comfyUiScheduler: 'normal',
   });
   const [history, setHistory] = useState<GenerationHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -188,6 +191,8 @@ const App: React.FC = () => {
   const [visibleRatGifs, setVisibleRatGifs] = useState<string[]>([]);
   const [resetTargetClicks, setResetTargetClicks] = useState<number | null>(null);
   const [resetCurrentClicks, setResetCurrentClicks] = useState(0);
+  
+  const [activeTab, setActiveTab] = useState<AppTab>('generate');
 
   // Load history from IndexedDB on startup
   useEffect(() => {
@@ -471,7 +476,10 @@ const App: React.FC = () => {
             config.height ?? 1024,
             config.comfyUiSeed,
             config.loras,
-            config.cfg
+            config.cfg,
+            config.comfyUiSteps,
+            config.comfyUiSamplerName,
+            config.comfyUiScheduler
         );
 
         setStatusMessage({ text: '✅ Prompt successfully queued in ComfyUI. Generation is running in the background.', type: 'success' });
@@ -785,76 +793,88 @@ const App: React.FC = () => {
         onHeaderClick={handleHeaderClick}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
       />
       <main ref={mainRef} className="container mx-auto p-4 md:p-8 flex-grow space-y-8">
-        <div className="max-w-4xl mx-auto space-y-4">
-          {statusMessage && <StatusMessage message={statusMessage} />}
-          <ImagePromptForm
-            prompt={prompt} setPrompt={setPrompt}
-            config={config} setConfig={setConfig}
-            onSubmit={handleGenerate}
-            isLoading={isLoading}
-            onOpenStyleManager={() => setIsStyleManagerOpen(true)}
-            onOpenRecipeManager={() => setIsRecipeManagerOpen(true)}
-            savedPresets={savedPresets}
-            customStyles={customStyles}
-            onApplyPreset={(styles: string[]) => setConfig(prev => ({ ...prev, styles }))}
-            uploadedImage={uploadedImage}
-            setUploadedImage={setUploadedImage}
-            onEnhancePrompt={handleEnhancePrompt}
-            isEnhancing={isEnhancing}
-            onSuggestNegativePrompt={handleSuggestNegativePrompt}
-            isSuggestingNegative={isSuggestingNegative}
-            onCheckSafety={handleCheckPromptSafety}
-            isCheckingSafety={isCheckingSafety}
-            safetyCheckResult={safetyCheckResult}
-            setSafetyCheckResult={setSafetyCheckResult}
-            comfyUiServerAddress={comfyUiServerAddress}
-            setComfyUiServerAddress={setComfyUiServerAddress}
-            onOpenComfyGuide={() => setIsComfyGuideOpen(true)}
-            onOpenComfyUIEmbed={() => setIsComfyEmbedOpen(true)}
-            onSyncComfyImages={handleSyncComfyImages}
-            onQueueComfyInBackground={handleQueueComfyInBackground}
-            comfyUiStatus={comfyUiStatus}
-            onCheckComfyConnection={checkComfyConnection}
-            comfyUiWorkflows={comfyUiWorkflows}
-            selectedComfyUiWorkflowId={config.selectedComfyUiWorkflowId || ''}
-            setSelectedComfyUiWorkflowId={(id) => setConfig(prev => ({ ...prev, selectedComfyUiWorkflowId: id }))}
-            onOpenWorkflowManager={() => setIsWorkflowManagerOpen(true)}
-            comfyUiCheckpoints={comfyUiCheckpoints}
-            comfyUiLoras={comfyUiLoras}
-            selectedComfyUiCheckpoint={config.selectedComfyUiCheckpoint || ''}
-            setSelectedComfyUiCheckpoint={(val) => setConfig(prev => ({...prev, selectedComfyUiCheckpoint: val}))}
-            managedTags={managedTags}
-            onOpenTagManager={() => setIsTagManagerOpen(true)}
-            onOpenNegativeGuide={() => setIsNegativeGuideOpen(true)}
-            onOpenCheckpointManager={() => setIsCheckpointManagerOpen(true)}
-            hiddenCheckpoints={hiddenCheckpoints}
-          />
-        </div>
-        <div className="max-w-7xl mx-auto">
-          <ImageDisplay
-            images={history}
-            isLoading={isLoading}
-            config={config}
-            onSelectCheckpointRequest={() => mainRef.current?.querySelector<HTMLElement>('#comfy-checkpoint')?.focus()}
-            processingIndex={processingIndex}
-            sendingToComfyId={sendingToComfyId}
-            onDownload={handleDownloadImage}
-            onCopyImage={handleCopyImage}
-            onUseAsInput={(data) => setUploadedImage({ data, mimeType: 'image/png' })}
-            onSendToComfyCanvas={handleSendToComfyCanvas}
-            onEnhance={handleEnhanceImage}
-            onFixFace={handleFixFace}
-            onUpscale={handleUpscale}
-            onRemoveWatermark={handleRemoveWatermark}
-            onMagicEdit={(id, data) => setMagicEditState({ isOpen: true, imageId: id, imageData: data, isLoading: false })}
-            onShare={handleShareRecipe}
-            onDelete={handleDeleteHistory}
-            onViewWorkflow={(json) => setWorkflowToPreview(json)}
-            onRemix={handleLoadHistory}
-          />
-        </div>
+        {activeTab === 'generate' && (
+            <>
+                <div className="max-w-4xl mx-auto space-y-4">
+                  {statusMessage && <StatusMessage message={statusMessage} />}
+                  <ImagePromptForm
+                    prompt={prompt} setPrompt={setPrompt}
+                    config={config} setConfig={setConfig}
+                    onSubmit={handleGenerate}
+                    isLoading={isLoading}
+                    onOpenStyleManager={() => setIsStyleManagerOpen(true)}
+                    onOpenRecipeManager={() => setIsRecipeManagerOpen(true)}
+                    savedPresets={savedPresets}
+                    customStyles={customStyles}
+                    onApplyPreset={(styles: string[]) => setConfig(prev => ({ ...prev, styles }))}
+                    uploadedImage={uploadedImage}
+                    setUploadedImage={setUploadedImage}
+                    onEnhancePrompt={handleEnhancePrompt}
+                    isEnhancing={isEnhancing}
+                    onSuggestNegativePrompt={handleSuggestNegativePrompt}
+                    isSuggestingNegative={isSuggestingNegative}
+                    onCheckSafety={handleCheckPromptSafety}
+                    isCheckingSafety={isCheckingSafety}
+                    safetyCheckResult={safetyCheckResult}
+                    setSafetyCheckResult={setSafetyCheckResult}
+                    comfyUiServerAddress={comfyUiServerAddress}
+                    setComfyUiServerAddress={setComfyUiServerAddress}
+                    onOpenComfyGuide={() => setIsComfyGuideOpen(true)}
+                    onOpenComfyUIEmbed={() => setIsComfyEmbedOpen(true)}
+                    onSyncComfyImages={handleSyncComfyImages}
+                    onQueueComfyInBackground={handleQueueComfyInBackground}
+                    comfyUiStatus={comfyUiStatus}
+                    onCheckComfyConnection={checkComfyConnection}
+                    comfyUiWorkflows={comfyUiWorkflows}
+                    selectedComfyUiWorkflowId={config.selectedComfyUiWorkflowId || ''}
+                    setSelectedComfyUiWorkflowId={(id) => setConfig(prev => ({ ...prev, selectedComfyUiWorkflowId: id }))}
+                    onOpenWorkflowManager={() => setIsWorkflowManagerOpen(true)}
+                    comfyUiCheckpoints={comfyUiCheckpoints}
+                    comfyUiLoras={comfyUiLoras}
+                    selectedComfyUiCheckpoint={config.selectedComfyUiCheckpoint || ''}
+                    setSelectedComfyUiCheckpoint={(val) => setConfig(prev => ({...prev, selectedComfyUiCheckpoint: val}))}
+                    managedTags={managedTags}
+                    onOpenTagManager={() => setIsTagManagerOpen(true)}
+                    onOpenNegativeGuide={() => setIsNegativeGuideOpen(true)}
+                    onOpenCheckpointManager={() => setIsCheckpointManagerOpen(true)}
+                    hiddenCheckpoints={hiddenCheckpoints}
+                  />
+                </div>
+                <div className="max-w-7xl mx-auto">
+                  <ImageDisplay
+                    images={history}
+                    isLoading={isLoading}
+                    config={config}
+                    onSelectCheckpointRequest={() => mainRef.current?.querySelector<HTMLElement>('#comfy-checkpoint')?.focus()}
+                    processingIndex={processingIndex}
+                    sendingToComfyId={sendingToComfyId}
+                    onDownload={handleDownloadImage}
+                    onCopyImage={handleCopyImage}
+                    onUseAsInput={(data) => setUploadedImage({ data, mimeType: 'image/png' })}
+                    onSendToComfyCanvas={handleSendToComfyCanvas}
+                    onEnhance={handleEnhanceImage}
+                    onFixFace={handleFixFace}
+                    onUpscale={handleUpscale}
+                    onRemoveWatermark={handleRemoveWatermark}
+                    onMagicEdit={(id, data) => setMagicEditState({ isOpen: true, imageId: id, imageData: data, isLoading: false })}
+                    onShare={handleShareRecipe}
+                    onDelete={handleDeleteHistory}
+                    onViewWorkflow={(json) => setWorkflowToPreview(json)}
+                    onRemix={handleLoadHistory}
+                  />
+                </div>
+            </>
+        )}
+        {activeTab === 'merge' && (
+            <div className="text-center p-8 bg-bg-secondary/50 rounded-lg text-text-secondary border-2 border-dashed border-border-primary animate-fade-in">
+                <h2 className="text-2xl font-bold text-text-primary mb-2">Welcome to the Merge Studio</h2>
+                <p>This is a new space for ComfyUI merging features. Stay tuned!</p>
+            </div>
+        )}
       </main>
       <Footer />
 

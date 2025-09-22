@@ -21,6 +21,7 @@ export const styleModifiers: Record<ArtisticStyle, string> = {
     'pixel-art': ', pixel art, 16-bit, retro video game style, detailed sprites',
     'comic-book': ', comic book art, american comic style, bold lines, halftone dots, vibrant',
     'line-art': ', line art, clean lines, black and white, minimalist, vector style',
+    'colored-line-art': ', colored line art, clean lines, vibrant colors, flat colors, minimalist, vector style',
     'isometric': ', isometric style, 3d render, diorama, detailed, high resolution',
     'vaporwave': ', vaporwave aesthetic, neon colors, retro-futuristic, 80s style, chrome text, glitch art',
     'ghibli-esque': ', ghibli studio art style, whimsical, hand-drawn, beautiful detailed backgrounds',
@@ -32,7 +33,7 @@ export const styleModifiers: Record<ArtisticStyle, string> = {
     'pop-art': ', pop art style, bold colors, blocky outlines, inspired by comic strips, andy warhol style',
     'cyber-gothic': ', cyber gothic fashion, dark ornate clothing, futuristic aesthetic, neon accents, intricate details, moody lighting',
     'anypastel': ', soft pastel colors, dreamy aesthetic, anime style, clean line art, low contrast, gentle lighting',
-    'arc-fantasy': ', epic high fantasy, intricate armor, mythical creatures, dramatic cinematic lighting, rich colors, detailed environment art',
+    'arc-fantasy': ', epic high fantasy, dramatic cinematic lighting, rich colors, detailed environment art',
     'arc-rococo': ', rococo art style, ornate details, elegant, pastel palette with gold trim, elaborate aristocratic fashion, delicate',
     'cinematic': ', cinematic, dramatic lighting, wide-angle, movie still, film grain, epic',
     'hyper-realism': ', hyperrealistic, extremely detailed, 8k, sharp focus, Unreal Engine 5 render, professional photography',
@@ -47,6 +48,8 @@ export const styleModifiers: Record<ArtisticStyle, string> = {
     'shinkai-makoto': ', Makoto Shinkai anime style, breathtaking beautiful scenery, detailed backgrounds, dramatic lighting, vibrant colors, cinematic',
     'lo-fi': ', lo-fi aesthetic, chillhop style, relaxed cozy vibe, anime character studying, soft colors, grainy filter, night time',
     'claymation': ', claymation style, stop-motion animation, plasticine model, detailed textures, Aardman animations style',
+    'colored-pencil': ', colored pencil drawing, hand-drawn, sketchbook style, textured paper, layered colors, cross-hatching, visible strokes',
+    'colored-sketch': ', colored sketch, hand-drawn, sketchbook style, rough lines, visible pencil strokes, cross-hatching, lightly colored, loose coloring',
     'papercraft': ', papercraft style, paper cutout art, layered paper, vibrant colors, handcrafted look, 2d illustration',
     'splatter-art': ', abstract expressionism, splatter art, drip painting, chaotic, dynamic, vibrant, Jackson Pollock style',
     'retro-anime-90s': ', 90s retro anime style, cel animation, vintage look, soft colors, film grain, nostalgic',
@@ -56,7 +59,7 @@ export const styleModifiers: Record<ArtisticStyle, string> = {
     'film-grain': ', film grain, cinematic, vintage film look, noisy texture, grainy',
     'gritty': ', gritty, textured, dark, high contrast, rough, raw aesthetic',
     'anime-fantasy': ', anime fantasy style, magical, enchanted, detailed armor and robes, mystical creatures, epic scenery',
-    'anime-dark-fantasy': ', dark fantasy anime style, gothic, moody, Berserk inspired, grim, intricate dark armor, demonic elements',
+    'anime-dark-fantasy': ', dark fantasy anime style, gothic, moody, grimdark atmosphere, Berserk inspired, detailed line art, dramatic shading, high contrast',
     'modern-anime': ', modern anime style, crisp digital art, vibrant colors, clean lines, trending on pixiv, high quality animation key visual',
     'novelai-style': ', masterpiece, best quality, absurdres, highres, novelai aesthetic, anime screencap, beautiful detailed eyes, perfect composition',
     'danbooru-style': ', danbooru tag style, tag-based prompt, masterpiece, best quality, absurdres, detailed',
@@ -74,6 +77,7 @@ export const styleModifiers: Record<ArtisticStyle, string> = {
     'double-exposure': ', double exposure effect, silhouette of a person combined with a nature scene, artistic, creative photography',
     'abstract-tech': ', abstract technology, data visualization, glowing circuits, network of nodes, dark background, futuristic, complex',
     'certified-rat-style': ', cute and clean character art, soft pastel colors, wholesome, high quality illustration, polished, sfw, by KookiePum',
+    'painterly': ', painterly style, expressive brush strokes, textured, digital painting, impasto, trending on artstation',
 
     // New Anime Styles
     'gachiakuta-manga': ', gachiakuta manga style, gritty detailed inkwork, dynamic composition, urban fantasy, rough textures, expressive line art',
@@ -101,40 +105,67 @@ export const styleModifiers: Record<ArtisticStyle, string> = {
     // Styles from user images
     'high-contrast-manga': ', manga style, black and white, monochrome, high contrast, detailed line art, hatching, ink drawing, sharp lines, dramatic shadows',
     'volcanic-soul': ', obsidian skin, cracked lava texture, internal fire, glowing embers, elemental demon, painterly, digital painting, fantasy concept art, dramatic lighting',
+    'crystalline-frost': ', crystalline body, fractured ice texture, internal glowing frost, cold blue light, elemental golem, painterly, digital painting, fantasy concept art, dramatic lighting',
     'gothic-anime': ', dark anime style, gothic, elegant, muted color palette, beautiful detailed eyes, sharp lines, dark and moody atmosphere, character portrait',
     'polished-furry': ', modern anthro style, furry art, semi-realistic, clean shading, detailed fur texture, expressive character portrait, high quality, trending on artstation',
     'webtoon-style': ', webtoon style, manhwa art style, clean line art, soft cell shading with gradients, character portrait, vertical format aesthetic',
     'ethereal-anime-painting': ', soft lighting, painterly anime style, semi-realistic, 2.5D, beautiful detailed face, delicate features, ethereal, dreamy atmosphere, trending on pixiv',
     'rendered-digital-art': ', highly polished digital painting, clean line art, smooth shading and rendering, detailed character art, professional illustration, trending on artstation',
     'cel-shaded-illustration': ', cel shading, bold outlines, flat colors with minimal gradients, anime key visual style, official art, vibrant',
+    'tactical-anime': ', masterpiece, best quality, ultra detailed, modern anime style, gritty, detailed sharp line art, muted color palette, high contrast, cinematic lighting',
     
     // Styles from new images
     'vibrant-abstract-painting': ', vibrant abstract painting style, expressive brush strokes, colorful blocky background, modern anime character, masterpiece',
     'glossy-airbrushed-anime': ', glossy airbrushed anime, 2.5d style, high specularity, shiny skin, vibrant saturated colors, polished rendering, masterpiece, trending on pixiv',
+    'high-resolution-pixel-art': ', high resolution pixel art, detailed, intricate, sharp pixels, vibrant colors, trending on behance',
+
+    // More unique styles
+    'stained-glass-window': ', stained glass window art style, vibrant colors, intricate leaded lines, glowing light, masterpiece, detailed',
+    'tarot-card': ', tarot card illustration, art nouveau style, symbolic imagery, intricate border, mystical, occult, detailed line art, masterpiece',
+    'riso-print': ', risograph print style, limited color palette, grainy texture, layered colors, halftone, screen printing aesthetic, indie art',
+    'art-deco-futurism': ', art deco futurism, sleek geometric shapes, metallic accents, retro-futuristic, Metropolis movie aesthetic, grand scale, elegant',
+    'golden-hour-photography': ', golden hour photography, soft warm light, long shadows, lens flare, bokeh, photorealistic, cinematic, beautiful',
+    'trigger-studio-style': ', Studio Trigger anime style, hyper-kinetic action, explosive effects, sharp angular character design, vibrant, high-energy, Gurren Lagann, Kill la Kill, Promare',
+    'ufotable-style': ', Ufotable anime style, cinematic lighting, deep shadows, incredible particle effects, polished digital animation, detailed backgrounds, Demon Slayer, Fate series',
+    'kyoto-animation-style': ', Kyoto Animation style, soft character designs, beautiful detailed eyes, expressive animation, detailed backgrounds, emotional, slice of life, KyoAni aesthetic',
 };
 
 const detailModifiers: Record<string, string> = {
-    '-3': ', abstract, simple shapes, extremely minimalist',
+    '-5': ', very abstract, impressionistic, minimalist',
+    '-4': ', abstract, minimalist',
+    '-3': ', simple shapes, minimalist',
     '-2': ', minimalist, low detail',
     '-1': ', simple details',
     '0': '',
-    '1': ', detailed, complex',
+    '1': ', detailed',
     '2': ', highly detailed, intricate',
-    '3': ', ornate, hyperdetailed, maximalist, intricate details',
+    '3': ', ornate, complex details',
+    '4': ', hyperdetailed, maximalist',
+    '5': ', extremely detailed, professional, 8k',
 };
 
 const intensityModifiers: Record<string, string> = {
+    '-10': ', extremely subtle, desaturated, washed out, low contrast',
+    '-9': ', very desaturated, very low contrast',
+    '-8': ', desaturated, low contrast',
+    '-7': ', muted colors, soft lighting',
+    '-6': ', gentle colors, soft',
     '-5': ', very subtle, soft lighting, low contrast, desaturated',
     '-4': ', subtle, muted tones',
     '-3': ', understated',
     '-2': ', slightly softened',
     '-1': ', less intense',
     '0': '',
-    '1': ', slightly enhanced',
-    '2': ', moderately intense, vibrant',
-    '3': ', intense, high contrast, detailed',
-    '4': ', very intense, dramatic lighting, high detail',
-    '5': ', extremely intense, hyper-detailed, dramatic composition, masterpiece',
+    '1': ', slightly enhanced, vibrant',
+    '2': ', moderately intense, vibrant colors',
+    '3': ', intense, high contrast',
+    '4': ', very intense, dramatic lighting',
+    '5': ', extremely intense, hyper-detailed, dramatic composition',
+    '6': ', extremely vibrant, dramatic lighting',
+    '7': ', hyper-vibrant, intense colors',
+    '8': ', overwhelming intensity, high contrast lighting',
+    '9': ', extreme contrast, dramatic and vibrant',
+    '10': ', maximalist intensity, explosive contrast and color',
 };
 
 
@@ -156,8 +187,8 @@ export function getComfyPrompt(prompt: string, config: ImageConfig, customStyles
     }).filter(Boolean);
 
     const suffixKeywords = config.promptSuffix ? [config.promptSuffix] : [];
-    const detailKeywords = detailModifiers[config.detailLevel.toString()];
-    const intensityKeywords = intensityModifiers[config.styleIntensity.toString()];
+    const detailKeywords = detailModifiers[config.detailLevel.toString()] || '';
+    const intensityKeywords = intensityModifiers[config.styleIntensity.toString()] || '';
 
     const allKeywordStrings = [
         ...styleKeywords,
