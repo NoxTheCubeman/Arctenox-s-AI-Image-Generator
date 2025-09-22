@@ -22,14 +22,14 @@ This application connects to the Google Gemini API using an API key. There are t
 2.  **Create an environment file:**
     Create a file named `.env.local` in the root of the project and add your API key:
     ```
-    VITE_API_KEY="YOUR_GEMINI_API_KEY_HERE"
+    GEMINI_API_KEY="YOUR_GEMINI_API_KEY_HERE"
     ```
     *This file is ignored by Git, so your key will not be committed.*
 3.  **Run the development server:**
     `npm run dev`
     
-    The Vite development server will automatically load the `VITE_API_KEY` from your `.env.local` file.
+    The Vite development server will automatically load the `GEMINI_API_KEY` from your `.env.local` file.
 
 ## Deploying
 
-You can deploy this project to any static hosting service like Vercel, Netlify, or GitHub Pages. During the build process, you must provide the `VITE_API_KEY` as an environment variable in your hosting provider's settings.
+You can deploy this project to any static hosting service like Vercel, Netlify, or GitHub Pages. During the build process, you must provide the `GEMINI_API_KEY` as an environment variable in your hosting provider's settings.
